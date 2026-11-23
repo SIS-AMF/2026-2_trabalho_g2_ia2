@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Formalizar features de produto, embalagem, preço, contexto temporal genérico e perfil de cesta, consolidando a tabela de cestas e o catálogo oficial de SKUs |
-| **Módulos & Notebooks** | `src/features.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
+| **Módulos & Notebooks** | `src/utils/temporal.py`, `src/data/features.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
 | **Testes** | `tests/test_features.py` |
 | **Entrada** | `data/processed/itens_limpos.parquet` |
 | **Saídas** | `data/processed/pedidos_cestas.parquet`, `models/recommender_v1/catalog_metadata.json` |

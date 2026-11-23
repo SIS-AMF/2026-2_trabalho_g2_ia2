@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Implementar os baselines estatísticos, a rede neural principal Multi-Task genérica (`dim = 99`, 3 cabeças + pós-processamento com filtro de estoque), o modelo comparativo Denoising Autoencoder e o ajuste de hiperparâmetros com Optuna |
-| **Módulos & Notebooks** | `src/baselines.py`, `src/models.py`, `src/losses.py`, `src/train.py`, `notebooks/03_treino_e_avaliacao.ipynb` |
+| **Módulos & Notebooks** | `src/modeling/baselines.py`, `src/modeling/models.py`, `src/modeling/losses.py`, `src/modeling/train.py`, `notebooks/03_treino_e_avaliacao.ipynb` |
 | **Testes** | `tests/test_model_and_export.py` (*forward pass*, máscara da loss e filtro de estoque Top-$K$) |
 | **Entradas** | `data/processed/splits/`, `models/recommender_v1/catalog_metadata.json` |
 | **Saídas** | Checkpoints de treino, `reports/figures/07_curvas_treinamento.png`, histórico de *trials* Optuna |
@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Baselines Não-Neurais Obrigatórios (`src/baselines.py`)
+## 1. Baselines Não-Neurais Obrigatórios (`src/modeling/baselines.py`)
 Para demonstrar cientificamente o valor agregado da rede neural, implementamos dois baselines genéricos usando exatamente o mesmo split 80/20:
 1. **Baseline 1 — Popularidade Global:** ranqueia os SKUs mais frequentes no conjunto de treino (excluindo itens já no carrinho e itens fora de estoque), prevendo `qtd_pacotes = 1` (moda global = 80,7%).
 2. **Baseline 2 — Matriz de Co-ocorrência / Regras de Associação (Confiança e Lift):** dado o conjunto de SKUs no carrinho, soma a pontuação condicional $P(s_j \mid s_i)$ (com suavização de Laplace) e prevê a mediana histórica de `qtd_pacotes` para o SKU recomendado.
@@ -38,17 +38,17 @@ flowchart LR
 
 ## 3. Modelo Principal — `FairMultiTaskRecommender` (PyTorch)
 Alinhado diretamente aos conceitos da Aula 10 ([material_neural_network.pdf](../material_neural_network.pdf)):
-- **Arquitetura (`src/models.py` — `torch.nn.Module`):**
+- **Arquitetura (`src/modeling/models.py` — `torch.nn.Module`):**
   - *Backbone Feedforward:* `Linear(99, 128) → BatchNorm1d(128) → ReLU → Dropout(0.30) → Linear(128, 64) → BatchNorm1d(64) → ReLU → Dropout(0.20)`.
   - *Cabeça 1 (`head_base`):* `Linear(64, 20)` — logits multi-label para os 20 `produto_base`.
   - *Cabeça 2 (`head_sku`):* `Linear(64, 34)` — logits multi-label para os 34 `produto_com_multiplicador` (`sku_norm`).
   - *Cabeça 3 (`head_qty`):* `Linear(64, 34)` + `Softplus` (garante saída $\ge 0$ em escala `log1p(qtd_pacotes)`).
-- **Função de Erro (`src/losses.py` — `MultiTaskRecommendationLoss`):**
+- **Função de Erro (`src/modeling/losses.py` — `MultiTaskRecommendationLoss`):**
   $$\mathcal{L}_{\text{total}} = w_1 \cdot \mathcal{L}_{\text{BCE}}^{\text{masked}}(\hat{y}_{\text{base}}, y_{\text{base}}) + w_2 \cdot \mathcal{L}_{\text{BCE}}^{\text{masked}}(\hat{y}_{\text{sku}}, y_{\text{sku}}) + w_3 \cdot \mathcal{L}_{\text{SmoothL1}}^{\text{pos}}(\hat{y}_{\text{qty}}, y_{\text{qty}})$$
   - `BCEWithLogitsLoss` com `pos_weight` moderado ($\sqrt{N_{\text{neg}}/N_{\text{pos}}}$ limitado a um teto) para evitar colapso apenas nos 3 itens mais populares.
   - Máscara na *loss* de classificação excluindo SKUs já presentes no carrinho.
   - `SmoothL1Loss` (Huber) aplicada **somente nos índices positivos (`y_sku == 1`)**, calibrando a previsão de `qtd_pacotes` exclusivamente sobre itens efetivamente comprados.
-- **Otimizador, Regularização e Convergência (`src/train.py`):**
+- **Otimizador, Regularização e Convergência (`src/modeling/train.py`):**
   - Otimizador **`torch.optim.AdamW`** (`lr=1e-3`, `weight_decay=1e-4` para regularização L2).
   - Scheduler **`ReduceLROnPlateau`** monitorando `val_ndcg@3`.
   - **`EarlyStopping`** (paciência de 15–20 épocas) sobre o sub-split de validação interno (dentro dos 80% de Desenvolvimento) para evitar *overfitting* sem tocar no Teste (20%).

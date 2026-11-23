@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Gerar evidências quantitativas e 6 gráficos reproduzíveis que comprovam a dor de negócio, validam a limpeza e sustentam o `README.md`, os notebooks `.ipynb` e o *pitch* |
-| **Módulos & Notebooks** | `src/eda.py`, `notebooks/02_eda_e_cestas.ipynb` |
+| **Módulos & Notebooks** | `src/data/eda.py`, `notebooks/02_eda_e_cestas.ipynb` |
 | **Testes** | Validação de geração dos 6 arquivos de imagem e resumo estatístico |
 | **Entradas** | `data/processed/itens_limpos.parquet`, `data/processed/pedidos_cestas.parquet`, `reports/preprocessing_audit.json` |
 | **Saídas** | `reports/figures/01_*.png` .. `06_*.png`, `reports/eda_summary.json` |
@@ -31,6 +31,6 @@
 ---
 
 ## Critérios de Pronto (*Definition of Done*)
-- [x] Execução limpa via comando único (`python -m src.eda`) e exibição verificada em `notebooks/02_eda_e_cestas.ipynb`.
+- [x] Execução limpa via comando único (`python -m src.data.eda`) e exibição verificada em `notebooks/02_eda_e_cestas.ipynb`.
 - [x] Todos os 6 arquivos PNG gerados em `reports/figures/` sem texto cortado ou sobreposto.
 - [x] `reports/eda_summary.json` consistente com os achados documentados na Etapa 1 e Etapa 2.

@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Empacotar o modelo treinado e seus artefatos em formato versionado, implementar o `RecommenderService` com **filtro de estoque Top-$K$** e expor uma **API REST simples em FastAPI** para servir o frontend React + Vite |
-| **Módulos** | `src/export.py`, `src/inference.py`, `api/main.py` |
+| **Módulos** | `src/serving/export.py`, `src/serving/inference.py`, `api/main.py` |
 | **Testes** | `tests/test_model_and_export.py` (*round-trip save → load → predict*, filtro de estoque e endpoints da API) |
 | **Entradas** | Melhor checkpoint de `FairMultiTaskRecommender`, `StandardScaler` do treino, `catalog_metadata.json`, métricas do teste |
 | **Saídas** | Pacote `models/recommender_v1/` + API REST `api/main.py` |
@@ -15,12 +15,11 @@
 
 ## 1. Anatomia do Pacote Exportado (`models/recommender_v1/`)
 1. **`model_weights.pt`:** pesos treinados (`model.state_dict()`) + dicionário de hiperparâmetros arquiteturais (`in_dim=99`, `hidden_dims`, `dropout`, `n_bases=20`, `n_skus=34`, `lambda_hier`) para reconstrução exata do módulo PyTorch.
-2. **`model_scripted.pt` *(opcional/bônus)*:** versão exportada via `torch.jit.trace` / `torch.jit.script` para portabilidade desacoplada da classe Python.
-3. **`preprocessing_artifacts.joblib`:** `StandardScaler` das 5 estatísticas do carrinho e dicionários `base_to_idx` / `sku_to_idx`.
-4. **`catalog_metadata.json`:** tabela oficial dos 34 SKUs (`produto_base`, `tipo_embalagem`, `multiplicador`, preços de referência e `display_name`).
-5. **`training_report.json`:** data/hora, seed, hiperparâmetros vencedores, histórico de épocas e métricas reais no Teste 20% (incluindo `hit_rate_at_3` e `ndcg_at_3`).
+2. **`preprocessing_artifacts.joblib`:** `StandardScaler` das 5 estatísticas do carrinho e dicionários `base_to_idx` / `sku_to_idx`.
+3. **`catalog_metadata.json`:** tabela oficial dos 34 SKUs (`produto_base`, `tipo_embalagem`, `multiplicador`, preços de referência e `display_name`).
+4. **`training_report.json`:** data/hora, seed, hiperparâmetros vencedores, histórico de épocas e métricas reais no Teste 20% (incluindo `hit_rate_at_3` e `ndcg_at_3`).
 
-## 2. Contrato do Serviço de Inferência (`src/inference.py`)
+## 2. Contrato do Serviço de Inferência (`src/serving/inference.py`)
 Interface Python `RecommenderService.from_artifact("models/recommender_v1/")` com suporte nativo ao **filtro pós-processamento de estoque (`available_skus`)**:
 
 ```python
@@ -72,7 +71,7 @@ Execução local: `uvicorn api.main:app --reload --port 8000`.
 ---
 
 ## Critérios de Pronto (*Definition of Done*)
-- [x] Exportação executável via comando único (`python -m src.export`) gerando todos os artefatos em `models/recommender_v1/`.
+- [x] Exportação executável via comando único (`python -m src.serving.export`) gerando todos os artefatos em `models/recommender_v1/`.
 - [x] Teste *round-trip* (`save → load → recommend`) reproduzindo exatamente os mesmos scores (`atol=1e-6`).
 - [x] Garantia testada de que nenhum SKU presente em `cart_items` aparece nas recomendações.
 - [x] Garantia testada de que, ao remover um SKU do `available_skus` (simulando falta de estoque), o ranking **pula automaticamente para o próximo item disponível** mantendo Top-3 válido.

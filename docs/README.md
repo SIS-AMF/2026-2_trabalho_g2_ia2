@@ -13,14 +13,14 @@ Cada etapa abaixo é uma especificação autocontida, mapeada diretamente aos m�
 
 | # | Documento | Escopo da Etapa | Módulos, Notebooks & Testes | Saída Principal | Status |
 | :-: | :--- | :--- | :--- | :--- | :-: |
-| **1** | [1_preprocessing.md](1_preprocessing.md) | Funções puras de auditoria, validação de descontos, reconciliação contábil (`139 → 0`), outliers e tipagem | `src/config.py`, `src/preprocessing.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py` | `data/processed/itens_limpos.parquet` | `[x]` |
-| **2** | [2_features.md](2_features.md) | Features de produto, embalagem/multiplicador, preço, contexto temporal e catálogo oficial (`20 bases / 34 SKUs`) | `src/features.py`, `notebooks/01_*.ipynb`, `tests/test_features.py` | `data/processed/pedidos_cestas.parquet`, `catalog_metadata.json` | `[x]` |
-| **3** | [3_eda.md](3_eda.md) | Análise exploratória e geração de 6 evidências visuais para `README.md`, notebooks e pitch | `src/eda.py`, `notebooks/02_*.ipynb` | `reports/figures/01_*.png` .. `06_*.png` | `[x]` |
-| **4** | [4_dataset_e_split.md](4_dataset_e_split.md) | Split **80/20** anti-leakage por `pedido_id`, expansão por subconjuntos ($2^k - 2$), modelo genérico (`dim = 99`) e tensores `X / Y` | `src/dataset_builder.py`, `tests/test_dataset_split.py` | `data/processed/splits/` | `[x]` |
-| **5** | [5_modelagem_e_treino.md](5_modelagem_e_treino.md) | Baselines, MLP Multi-Task (3 cabeças, genérico), filtro de estoque Top-$K$, `BasketDAE` e Optuna | `src/baselines.py`, `src/models.py`, `src/losses.py`, `src/train.py`, `notebooks/03_*.ipynb` | Checkpoints + `07_curvas_treinamento.png` | `[x]` |
-| **6** | [6_avaliacao.md](6_avaliacao.md) | Avaliação no Hold-Out (20%): métricas Top-$K$, `Catalog Coverage@3`, erro de `qtd_pacotes` e casos qualitativos | `src/evaluate.py` | `reports/evaluation_summary.csv`, `08_comparacao_modelos.png` | `[x]` |
-| **7** | [7_exportacao_e_inferencia.md](7_exportacao_e_inferencia.md) | Empacotamento versionado do modelo, `RecommenderService` (com filtro de estoque) e API REST **FastAPI** | `src/export.py`, `src/inference.py`, `api/main.py`, `tests/test_model_and_export.py` | `models/recommender_v1/` + API REST | `[x]` |
-| **8** | [8_interface_e_entrega.md](8_interface_e_entrega.md) | Frontend **React + Vite** (adaptado de `front/feira-pdv`, venda simulada + Modal Top-3), `pytest`, GitHub e pitch (7 min) | `front/`, `README.md`, `tests/` | PDV funcional + Repositório pronto | `[x]` |
+| **1** | [1_preprocessing.md](1_preprocessing.md) | Funções puras de auditoria, validação de descontos, reconciliação contábil (`139 → 0`), outliers e tipagem | `src/config.py`, `src/utils/cleaning.py`, `src/data/preprocessing.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py` | `data/processed/itens_limpos.parquet` | `[x]` |
+| **2** | [2_features.md](2_features.md) | Features de produto, embalagem/multiplicador, preço, contexto temporal e catálogo oficial (`20 bases / 34 SKUs`) | `src/utils/temporal.py`, `src/data/features.py`, `notebooks/01_*.ipynb`, `tests/test_features.py` | `data/processed/pedidos_cestas.parquet`, `catalog_metadata.json` | `[x]` |
+| **3** | [3_eda.md](3_eda.md) | Análise exploratória e geração de 6 evidências visuais para `README.md`, notebooks e pitch | `src/data/eda.py`, `notebooks/02_*.ipynb` | `reports/figures/01_*.png` .. `06_*.png` | `[x]` |
+| **4** | [4_dataset_e_split.md](4_dataset_e_split.md) | Split **80/20** anti-leakage por `pedido_id`, expansão por subconjuntos ($2^k - 2$), modelo genérico (`dim = 99`) e tensores `X / Y` | `src/utils/baskets.py`, `src/data/dataset_builder.py`, `tests/test_dataset_split.py` | `data/processed/splits/` | `[x]` |
+| **5** | [5_modelagem_e_treino.md](5_modelagem_e_treino.md) | Baselines, MLP Multi-Task (3 cabeças, genérico), filtro de estoque Top-$K$, `BasketDAE` e Optuna | `src/modeling/baselines.py`, `src/modeling/models.py`, `src/modeling/losses.py`, `src/modeling/train.py`, `notebooks/03_*.ipynb` | Checkpoints + `07_curvas_treinamento.png` | `[x]` |
+| **6** | [6_avaliacao.md](6_avaliacao.md) | Avaliação no Hold-Out (20%): métricas Top-$K$, `Catalog Coverage@3`, erro de `qtd_pacotes` e casos qualitativos | `src/utils/ranking.py`, `src/modeling/evaluate.py` | `reports/evaluation_summary.csv`, `08_comparacao_modelos.png` | `[x]` |
+| **7** | [7_exportacao_e_inferencia.md](7_exportacao_e_inferencia.md) | Empacotamento versionado do modelo, `RecommenderService` (com filtro de estoque) e API REST **FastAPI** | `src/serving/export.py`, `src/serving/inference.py`, `api/main.py`, `tests/test_model_and_export.py` | `models/recommender_v1/` + API REST | `[x]` |
+| **8** | [8_interface_e_entrega.md](8_interface_e_entrega.md) | Frontend **React + Vite** (PDV com venda simulada + Modal Top-3), `pytest`, GitHub e pitch (7 min) | `front/`, `README.md`, `tests/` | PDV funcional + Repositório pronto | `[x]` |
 
 ---
 
@@ -92,27 +92,35 @@ ia-g2/
 │   ├── 01_preprocessamento_e_features.ipynb
 │   ├── 02_eda_e_cestas.ipynb
 │   └── 03_treino_e_avaliacao.ipynb
-├── src/
+├── src/                               # Arquitetura em 4 camadas acíclicas + orquestrador
 │   ├── config.py                      # Constantes, seeds, mapas canônicos e caminhos
-│   ├── preprocessing.py               # Etapa 1: funções puras de validação + orquestração
-│   ├── features.py                    # Etapa 2: engenharia de features e catálogo
-│   ├── eda.py                         # Etapa 3: geração automatizada de gráficos e relatórios
-│   ├── dataset_builder.py             # Etapa 4: cestas, split 80/20 anti-leakage e subconjuntos 2^k-2
-│   ├── baselines.py                   # Etapa 5: Popularidade e Co-ocorrência/Lift
-│   ├── models.py                      # Etapa 5: FairMultiTaskRecommender (MLP) e BasketDAE
-│   ├── losses.py                      # Etapa 5: MultiTaskRecommendationLoss mascarada
-│   ├── train.py                       # Etapa 5: loop de treino, validação interna, early stopping e tuning
-│   ├── evaluate.py                    # Etapa 6: métricas Top-K, quantidade e tabela comparativa
-│   ├── export.py                      # Etapa 7: serialização versionada do modelo e artefatos
-│   └── inference.py                   # Etapa 7: RecommenderService (inferência + filtro de estoque)
+│   ├── pipeline.py                    # Orquestrador ponta-a-ponta (python -m src.pipeline)
+│   ├── utils/                         # Camada 1: funções puras matemáticas (sem I/O)
+│   │   ├── cleaning.py                # Regras puras de saneamento, descontos e reconciliação contábil
+│   │   ├── temporal.py                # Codificação cíclica de hora, faixas, fim de semana e economia %
+│   │   ├── baskets.py                 # Combinatória 2^k-2, LOO e vetorização X/Y (dim=99)
+│   │   └── ranking.py                 # Combinação hierárquica, máscaras de estoque e métricas Top-K
+│   ├── data/                          # Camada 2: pipeline de processamento de dados
+│   │   ├── preprocessing.py           # Etapa 1: orquestração da auditoria e itens_limpos.parquet
+│   │   ├── features.py                # Etapa 2: pedidos_cestas.parquet e catalog_metadata.json
+│   │   ├── eda.py                     # Etapa 3: geração dos 6 gráficos e eda_summary.json
+│   │   └── dataset_builder.py         # Etapa 4: split 80/20 anti-leakage e tensores .npz
+│   ├── modeling/                      # Camada 3: baselines, redes PyTorch, treino e avaliação
+│   │   ├── baselines.py               # Etapa 5: Popularidade e Co-ocorrência/Lift
+│   │   ├── models.py                  # Etapa 5: FairMultiTaskRecommender (MLP) e BasketDAE
+│   │   ├── losses.py                  # Etapa 5: MultiTaskRecommendationLoss mascarada
+│   │   ├── evaluate.py                # Etapa 6: avaliação completa, gráfico comparativo e casos reais
+│   │   └── train.py                   # Etapa 5 & 6: treino, early stopping e busca Optuna
+│   └── serving/                       # Camada 4: exportação e inferência em produção
+│       ├── export.py                  # Etapa 7: serialização versionada do modelo e artefatos
+│       └── inference.py               # Etapa 7: RecommenderService (inferência + filtro de estoque)
 ├── api/
 │   └── main.py                        # Etapa 7: API REST leve em FastAPI servindo o modelo exportado
-├── front/                             # Etapa 8: PDV em React + Vite + TypeScript (adaptado de feira-pdv)
-│   └── feira-pdv/                     # Módulo PDV com catálogo mocado, venda simulada e Modal Top-3
+├── front/                             # Etapa 8: PDV em React + Vite + TypeScript (catálogo mocado, venda simulada e Modal Top-3)
+│   └── src/                           # Componentes PDV, cliente API, simulador de estoque e modais
 ├── models/
 │   └── recommender_v1/
 │       ├── model_weights.pt           # Pesos treinados (PyTorch state_dict)
-│       ├── model_scripted.pt          # Opcional: modelo TorchScript portável
 │       ├── preprocessing_artifacts.joblib  # Scalers e vocabulários
 │       ├── catalog_metadata.json      # Mapeamento oficial SKU -> base, embalagem, mult, preços
 │       └── training_report.json       # Hiperparâmetros, seed, curvas e métricas finais

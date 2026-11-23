@@ -4,21 +4,21 @@
 
 | Campo | Detalhe |
 | :--- | :--- |
-| **Objetivo** | Adaptar a interface real de PDV em `front/feira-pdv` (React + Vite + TypeScript) conectada à API FastAPI do modelo exportado, consolidar a suite de testes/documentação no GitHub e preparar o pitch de 7 minutos |
+| **Objetivo** | Construir a interface funcional de PDV em `front/` (React + Vite + TypeScript) conectada à API FastAPI do modelo exportado, consolidar a suite de testes/documentação no GitHub e preparar o pitch de 7 minutos |
 | **Módulos** | `front/` (React + Vite + TS), `api/main.py`, `README.md` (raiz), `tests/` |
-| **Entradas** | Base existente em `front/feira-pdv/`, API FastAPI (`models/recommender_v1/`), `reports/figures/`, `reports/evaluation_summary.csv` |
+| **Entradas** | API FastAPI (`models/recommender_v1/`), `reports/figures/`, `reports/evaluation_summary.csv` |
 | **Saídas** | PDV React + Vite funcional com **Venda Simulada + Modal de Recomendação IA (Top-3)**, repositório GitHub reprodutível e pitch ensaiado |
 | **Referência** | [descricao_trabalho.pdf](../descricao_trabalho.pdf) |
 | **Status** | `[x] Concluído` |
 
 ---
 
-## 1. Interface Funcional em React + Vite (Adaptação de `front/feira-pdv`)
+## 1. Interface Funcional em React + Vite (`front/src/`)
 
-Em vez de construir uma tela genérica do zero, adaptamos a estrutura real em Clean Architecture já presente em `front/feira-pdv/` (`domain/carrinho`, `PDVCart`, `PDVCatalog`, `PDVHeader`, `FeiraPDVMainPage`, modais):
+A interface em `front/src/` segue o layout operacional de PDV de feira (paleta artesanal cacau/creme, catálogo à esquerda, carrinho à direita e modais de apresentação, estoque, recomendação e sucesso):
 
-### 1.1 Adaptações Planejadas em `front/`
-1. **Shell Standalone React + Vite + TypeScript:** criar `front/package.json`, `vite.config.ts`, `index.html`, `src/main.tsx` e stubs leves locais substituindo imports externos do projeto original (`../../../../../shared/...`, Supabase e Mercado Pago Point).
+### 1.1 Componentes Implementados em `front/`
+1. **Aplicação Standalone React + Vite + TypeScript:** `front/package.json`, `vite.config.ts`, `index.html`, `src/main.tsx` e `src/App.tsx` sem dependências externas de Supabase ou pagamento real.
 2. **Catálogo Mocado Dinâmico (34 SKUs):** carregar os produtos a partir de `GET /api/catalog` (com *fallback* em JSON estático sincronizado com `catalog_metadata.json`), incluindo opção simples de marcar itens como **"Sem estoque"** para demonstrar ao vivo o pós-processamento de estoque pulando para o próximo item do ranking!
 3. **Fluxo de Venda Simulada:** remover a integração real de maquininha/pagamento (Point/Mercado Pago), mantendo uma finalização rápida e simulada para demonstração no pitch.
 4. **Novo Modal `PDVRecommendationModal` (disparado ao clicar em "Finalizar Venda"):**
@@ -59,10 +59,10 @@ Execução unificada via `pytest -v`:
 
 | Bloco | Período Sugerido | Entregas do Bloco | Critério de Pronto |
 | :--- | :--- | :--- | :--- |
-| **Bloco 1 — Setup + ETL (Funções Puras) + Features** | 22/11 (12h00–14h00) | `venv`, `requirements.txt`, `src/config.py`, `src/preprocessing.py`, `src/features.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py`, `tests/test_features.py` | `pytest` verde; 0 erros contábeis em 3.003 pedidos |
-| **Bloco 2 — EDA + Cestas ($2^k-2$) + Split 80/20 + Baselines** | 22/11 (14h00–16h00) | `src/eda.py`, 6 gráficos em `reports/figures/`, `notebooks/02_*.ipynb`, `src/dataset_builder.py`, `src/baselines.py`, `tests/test_dataset_split.py` | 6 gráficos salvos; split 80/20 sem leakage; baselines registrados |
-| **Bloco 3 — Redes Neurais + Tuning + Avaliação (20%)** | 22/11 (16h00–18h30) | `src/models.py`, `src/losses.py`, `src/train.py`, `src/evaluate.py`, `notebooks/03_*.ipynb` (MLP Multi-Task Genérico + DAE + Optuna) | Curvas de treino sem overfitting severo; tabela comparativa final gerada |
-| **Bloco 4 — Exportação + API FastAPI + Frontend React/Vite** | 22/11 (19h00–22h30) | `src/export.py`, `src/inference.py`, `api/main.py`, `models/recommender_v1/`, `front/` adaptado com **Modal Top-3** e venda simulada, `tests/test_model_and_export.py` | `pytest` 100% verde; PDV React consumindo FastAPI com Modal Top-3 funcionando ao vivo |
+| **Bloco 1 — Setup + ETL (Funções Puras) + Features** | 22/11 (12h00–14h00) | `venv`, `requirements.txt`, `src/config.py`, `src/utils/cleaning.py`, `src/utils/temporal.py`, `src/data/preprocessing.py`, `src/data/features.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py`, `tests/test_features.py` | `pytest` verde; 0 erros contábeis em 3.003 pedidos |
+| **Bloco 2 — EDA + Cestas ($2^k-2$) + Split 80/20 + Baselines** | 22/11 (14h00–16h00) | `src/data/eda.py`, 6 gráficos em `reports/figures/`, `notebooks/02_*.ipynb`, `src/utils/baskets.py`, `src/data/dataset_builder.py`, `src/modeling/baselines.py`, `tests/test_dataset_split.py` | 6 gráficos salvos; split 80/20 sem leakage; baselines registrados |
+| **Bloco 3 — Redes Neurais + Tuning + Avaliação (20%)** | 22/11 (16h00–18h30) | `src/modeling/models.py`, `src/modeling/losses.py`, `src/modeling/train.py`, `src/utils/ranking.py`, `src/modeling/evaluate.py`, `notebooks/03_*.ipynb` (MLP Multi-Task Genérico + DAE + Optuna) | Curvas de treino sem overfitting severo; tabela comparativa final gerada |
+| **Bloco 4 — Exportação + API FastAPI + Frontend React/Vite** | 22/11 (19h00–22h30) | `src/serving/export.py`, `src/serving/inference.py`, `src/pipeline.py`, `api/main.py`, `models/recommender_v1/`, `front/` adaptado com **Modal Top-3** e venda simulada, `tests/test_model_and_export.py` | `pytest` 100% verde; PDV React consumindo FastAPI com Modal Top-3 funcionando ao vivo |
 | **Bloco 5 — README, Prints, Revisão e Pitch** | 23/11 (08h00–11h00) | `README.md` raiz completo com prints/gráficos, teste limpo de reprodução, push final no GitHub e ensaio cronometrado do pitch (≤ 7 min) *(+ ablação com/sem evento apenas se sobrar tempo!)* | Repositório validado e pitch ensaiado com folga antes das 12h00 |
 
 ---

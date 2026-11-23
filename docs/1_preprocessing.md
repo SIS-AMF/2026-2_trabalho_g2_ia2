@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Transformar o CSV bruto em uma base auditada via **funções puras matemáticas**, sem inconsistências financeiras, sem unir produtos distintos e com tipagem rigorosa |
-| **Módulos & Notebooks** | `src/config.py`, `src/preprocessing.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
+| **Módulos & Notebooks** | `src/config.py`, `src/utils/cleaning.py`, `src/data/preprocessing.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
 | **Testes** | `tests/test_preprocessing.py` |
 | **Entrada** | [dataset.csv](../dataset.csv) (`3.815 linhas × 13 colunas`, `3.003 pedidos`) |
 | **Saídas** | `data/processed/itens_limpos.parquet`, `reports/preprocessing_audit.json` |
@@ -14,7 +14,7 @@
 ---
 
 ## 0. Princípio Arquitetural: Funções Puras + Transparência via Notebook
-- **Funções puras sem dependências externas (`src/preprocessing.py`):** toda regra de validação e cálculo é escrita como uma operação matemática isolada — recebe parâmetros específicos (ex.: `subtotal, desconto, total` ou `nome_limpo, produto_base, preco`) e retorna um valor determinístico, sem depender de estado global ou colunas ocultas de DataFrame.
+- **Funções puras sem dependências externas (`src/utils/cleaning.py`):** toda regra de validação e cálculo é escrita como uma operação matemática isolada — recebe parâmetros específicos (ex.: `subtotal, desconto, total` ou `nome_limpo, produto_base, preco`) e retorna um valor determinístico, sem depender de estado global ou colunas ocultas de DataFrame.
   - Exemplos de funções puras:
     - `validar_desconto_em_moeda(subtotal: float, valor_desconto: float, valor_total: float, tol: float = 0.01) -> tuple[bool, float]`
     - `normalizar_texto_produto(nome_bruto: str) -> str`
@@ -22,8 +22,8 @@
     - `extrair_embalagem_e_multiplicador(nome_limpo: str, produto_base: str, preco_bruto: float) -> tuple[str, int]`
     - `reconciliar_quantidade_e_preco(qtd_bruta: int, preco_bruto: float, multiplicador: int, pedido_divergente: bool, preco_eh_pacote: bool) -> tuple[int, int, float, float]`
     - `classificar_pedido_consolidado(subtotal: float, qtd_total_unidades: int, evento_original: str) -> bool`
-- **Orquestração:** uma função de alto nível (`executar_preprocessamento(df_bruto)`) apenas itera/aplica essas funções puras em sequência, registrando contagens antes/depois.
-- **Inspeção Didática (`notebooks/01_preprocessamento_e_features.ipynb`):** executa cada passo importando as funções de `src/preprocessing.py` e imprime amostras, contadores e validações passo a passo para total clareza.
+- **Orquestração (`src/data/preprocessing.py`):** uma função de alto nível (`executar_preprocessamento(df_bruto)`) apenas itera/aplica essas funções puras em sequência, registrando contagens antes/depois.
+- **Inspeção Didática (`notebooks/01_preprocessamento_e_features.ipynb`):** executa cada passo importando as funções de `src/utils/cleaning.py` e `src/data/preprocessing.py` e imprime amostras, contadores e validações passo a passo para total clareza.
 
 ## 1. Remoção de Colunas Inválidas (e Regra de Ordem)
 1. **Remover `pedido_vendedor` e `item_pedido_user_id`:** ambas as colunas são idênticas em 100% das linhas, possuem apenas 2 UUIDs de login compartilhado entre operadores (além de 1 registro `NaN` na `1 Moranguinho`) e não representam identidade individual de vendedor.

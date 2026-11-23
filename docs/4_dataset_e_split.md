@@ -5,7 +5,7 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Transformar as cestas limpas de varejo em exemplos supervisionados multi-label `(X_carrinho_parcial, X_tempo) -> (Y_base, Y_sku, Y_qtd_pacotes)` usando **split 80/20** por `pedido_id` e expansão por **subconjuntos únicos ($2^k - 2$)** sem *data leakage* |
-| **Módulos & Notebooks** | `src/dataset_builder.py`, `notebooks/02_eda_e_cestas.ipynb` |
+| **Módulos & Notebooks** | `src/utils/baskets.py`, `src/data/dataset_builder.py`, `notebooks/02_eda_e_cestas.ipynb` |
 | **Testes** | `tests/test_dataset_split.py` |
 | **Entradas** | `data/processed/pedidos_cestas.parquet`, `models/recommender_v1/catalog_metadata.json` |
 | **Saídas** | `data/processed/splits/` (índices fixos 80/20 por `pedido_id`, sub-split interno de validação, tensores e `StandardScaler` ajustado no treino) |
