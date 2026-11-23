@@ -1,0 +1,146 @@
+{
+  "entrada": {
+    "linhas_brutas": 3815,
+    "pedidos_brutos": 3003,
+    "colunas_brutas": 13
+  },
+  "remocoes": {
+    "colunas_vendedor_removidas": [
+      "pedido_vendedor",
+      "item_pedido_user_id"
+    ],
+    "pedido_tipo_desconto_removido": true,
+    "itens_removidos_qtd_zero_count": 2,
+    "itens_removidos_qtd_zero": [
+      {
+        "pedido_id": "ebbed809-e6f4-4b4a-9850-60eaa218e98b",
+        "evento_nome": "Expo Afubra",
+        "item_pedido_nome_produto": "Alfajor Preto (Caixa x16)",
+        "item_pedido_quantidade": 0
+      },
+      {
+        "pedido_id": "4680d5c5-3262-4e60-829e-5a9f976edaff",
+        "evento_nome": "EXPOBENTO",
+        "item_pedido_nome_produto": "Rapadura de Melado",
+        "item_pedido_quantidade": 0
+      }
+    ]
+  },
+  "descontos": {
+    "status_por_linha": {
+      "ja_em_moeda": 3815,
+      "convertido_de_percentual": 0,
+      "inconsistente": 0
+    },
+    "convertidos_de_percentual": 0,
+    "inconsistentes": 0
+  },
+  "reconciliacao_contabil": {
+    "pedidos_divergentes_antes": 139,
+    "pedidos_divergentes_depois": 0,
+    "max_erro_absoluto_reais": 0.0,
+    "casos_por_linha": {
+      "A": 2947,
+      "B": 148,
+      "C": 86,
+      "D": 632
+    }
+  },
+  "catalogo_normalizado": {
+    "total_produtos_base": 20,
+    "total_skus_canonicos": 34,
+    "produtos_base": [
+      "Alfajor Branco",
+      "Alfajor Preto",
+      "Amendoim Temperado",
+      "Amendoim Temperado 100g",
+      "Bolacha Cobertura Chocolate",
+      "Bolacha de Milho",
+      "Bolacha de manteiga",
+      "Bolacha de natal",
+      "Carrapinha",
+      "Cri-Cri 200g",
+      "Cuca Alemã",
+      "Cuca Enrolada de Amendoim",
+      "Cuca Enrolada de Chocolate",
+      "Pão branco",
+      "Pão de Cereais",
+      "Pão de Milho",
+      "Pé-de-Moleque",
+      "Rapadura Assada",
+      "Rapadura de Melado",
+      "Rapadura de Melado Grão Moído"
+    ],
+    "skus_canonicos": [
+      "Alfajor Branco (x1)",
+      "Alfajor Branco (x16)",
+      "Alfajor Branco (x4)",
+      "Alfajor Branco (x5)",
+      "Alfajor Preto (x1)",
+      "Alfajor Preto (x16)",
+      "Alfajor Preto (x4)",
+      "Alfajor Preto (x5)",
+      "Amendoim Temperado (x1)",
+      "Amendoim Temperado 100g (x1)",
+      "Bolacha Cobertura Chocolate (x1)",
+      "Bolacha de Milho (x1)",
+      "Bolacha de manteiga (x1)",
+      "Bolacha de natal (x1)",
+      "Carrapinha (x1)",
+      "Cri-Cri 200g (x1)",
+      "Cuca Alemã (x1)",
+      "Cuca Alemã (x2)",
+      "Cuca Alemã (x3)",
+      "Cuca Enrolada de Amendoim (x1)",
+      "Cuca Enrolada de Amendoim (x2)",
+      "Cuca Enrolada de Chocolate (x1)",
+      "Cuca Enrolada de Chocolate (x2)",
+      "Pão branco (x1)",
+      "Pão de Cereais (x1)",
+      "Pão de Milho (x1)",
+      "Pé-de-Moleque (x1)",
+      "Rapadura Assada (x1)",
+      "Rapadura Assada (x20)",
+      "Rapadura Assada (x6)",
+      "Rapadura de Melado (x1)",
+      "Rapadura de Melado (x3)",
+      "Rapadura de Melado Grão Moído (x1)",
+      "Rapadura de Melado Grão Moído (x3)"
+    ],
+    "mapa_sinonimos_aplicado": {
+      "Amendoim salgado e temperado": "Amendoim Temperado"
+    }
+  },
+  "segmentacao_pedidos": {
+    "linhas_finais": 3813,
+    "pedidos_finais": 3003,
+    "pedidos_gratuitos": 2,
+    "pedidos_consolidados": 18,
+    "pedidos_varejo": 2984,
+    "linhas_varejo": 3755
+  },
+  "schema_final": {
+    "pedido_id": "string",
+    "pedido_data": "datetime64[us, America/Sao_Paulo]",
+    "evento_nome": "category",
+    "evento_original": "category",
+    "ponto_venda": "category",
+    "pedido_metodo_pagamento": "category",
+    "metodo_pagamento_grupo": "category",
+    "pedido_subtotal": "float64",
+    "pedido_valor_desconto": "float64",
+    "pedido_valor_total": "float64",
+    "produto_base": "category",
+    "tipo_embalagem": "category",
+    "produto_com_multiplicador": "category",
+    "multiplicador": "int64",
+    "qtd_unidades_base": "int64",
+    "qtd_pacotes": "int64",
+    "preco_unitario": "float64",
+    "preco_pacote": "float64",
+    "item_valor_total": "float64",
+    "is_pedido_gratuito": "bool",
+    "is_pedido_consolidado": "bool",
+    "is_pedido_varejo": "bool"
+  }
+}

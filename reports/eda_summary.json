@@ -1,0 +1,96 @@
+{
+  "cestas_varejo": {
+    "pedidos_varejo_total": 2984,
+    "pedidos_varejo_1_sku": 2355,
+    "pedidos_varejo_multi_sku": 629,
+    "pct_varejo_1_sku": 78.9,
+    "pct_varejo_multi_sku": 21.1
+  },
+  "produtos_e_faturamento": {
+    "top_5_produtos_base": {
+      "Cuca Alemã": 1065,
+      "Cuca Enrolada de Amendoim": 549,
+      "Rapadura Assada": 549,
+      "Rapadura de Melado": 544,
+      "Alfajor Preto": 441
+    },
+    "faturamento_varejo_total": 78379.0
+  },
+  "top_10_pares_coocorrencia": [
+    {
+      "produto_a": "Cuca Alemã",
+      "produto_b": "Cuca Enrolada de Amendoim",
+      "coocorrencias": 89,
+      "lift": 0.46
+    },
+    {
+      "produto_a": "Rapadura Assada",
+      "produto_b": "Alfajor Preto",
+      "coocorrencias": 77,
+      "lift": 0.98
+    },
+    {
+      "produto_a": "Rapadura Assada",
+      "produto_b": "Rapadura de Melado",
+      "coocorrencias": 72,
+      "lift": 0.74
+    },
+    {
+      "produto_a": "Alfajor Preto",
+      "produto_b": "Alfajor Branco",
+      "coocorrencias": 49,
+      "lift": 3.07
+    },
+    {
+      "produto_a": "Cuca Enrolada de Amendoim",
+      "produto_b": "Rapadura de Melado",
+      "coocorrencias": 48,
+      "lift": 0.49
+    },
+    {
+      "produto_a": "Cuca Enrolada de Amendoim",
+      "produto_b": "Rapadura Assada",
+      "coocorrencias": 44,
+      "lift": 0.44
+    },
+    {
+      "produto_a": "Cuca Alemã",
+      "produto_b": "Rapadura Assada",
+      "coocorrencias": 42,
+      "lift": 0.22
+    },
+    {
+      "produto_a": "Rapadura de Melado",
+      "produto_b": "Alfajor Preto",
+      "coocorrencias": 35,
+      "lift": 0.45
+    },
+    {
+      "produto_a": "Rapadura de Melado",
+      "produto_b": "Amendoim Temperado",
+      "coocorrencias": 30,
+      "lift": 1.64
+    },
+    {
+      "produto_a": "Cuca Alemã",
+      "produto_b": "Rapadura de Melado",
+      "coocorrencias": 27,
+      "lift": 0.14
+    }
+  ],
+  "quantidades_e_ticket": {
+    "pct_qtd_pacotes_1": 80.7,
+    "pct_qtd_pacotes_2": 15.6,
+    "pct_qtd_pacotes_3_plus": 3.7,
+    "ticket_medio_varejo": 26.26,
+    "ticket_mediano_varejo": 25.0
+  },
+  "figuras_geradas": [
+    "01_distribuicao_itens_por_pedido.png",
+    "02_auditoria_expodireto_antes_depois.png",
+    "03_top_produtos_e_skus.png",
+    "04_heatmap_coocorrencia_lift.png",
+    "05_vendas_por_feira_e_horario.png",
+    "06_distribuicao_qtd_pacotes_e_outliers.png"
+  ]
+}
