@@ -9,7 +9,9 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 DATASET_RAW_PATH: Path = PROJECT_ROOT / "dataset.csv"
 DATA_PROCESSED_DIR: Path = PROJECT_ROOT / "data" / "processed"
 ITENS_LIMPOS_PATH: Path = DATA_PROCESSED_DIR / "itens_limpos.parquet"
+ITENS_LIMPOS_CSV_PATH: Path = DATA_PROCESSED_DIR / "itens_limpos.csv"
 PEDIDOS_CESTAS_PATH: Path = DATA_PROCESSED_DIR / "pedidos_cestas.parquet"
+PEDIDOS_CESTAS_CSV_PATH: Path = DATA_PROCESSED_DIR / "pedidos_cestas.csv"
 SPLITS_DIR: Path = DATA_PROCESSED_DIR / "splits"
 
 MODELS_DIR: Path = PROJECT_ROOT / "models"

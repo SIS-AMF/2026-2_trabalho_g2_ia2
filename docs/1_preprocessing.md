@@ -8,7 +8,7 @@
 | **Módulos & Notebooks** | `src/config.py`, `src/utils/cleaning.py`, `src/data/preprocessing.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
 | **Testes** | `tests/test_preprocessing.py` |
 | **Entrada** | [dataset.csv](../dataset.csv) (`3.815 linhas × 13 colunas`, `3.003 pedidos`) |
-| **Saídas** | `data/processed/itens_limpos.parquet`, `reports/preprocessing_audit.json` |
+| **Saídas** | `data/processed/itens_limpos.parquet`, `data/processed/itens_limpos.csv`, `reports/preprocessing_audit.json` |
 | **Status** | `[x] Concluído` |
 
 ---

@@ -13,8 +13,8 @@ Cada etapa abaixo é uma especificação autocontida, mapeada diretamente aos m�
 
 | # | Documento | Escopo da Etapa | Módulos, Notebooks & Testes | Saída Principal | Status |
 | :-: | :--- | :--- | :--- | :--- | :-: |
-| **1** | [1_preprocessing.md](1_preprocessing.md) | Funções puras de auditoria, validação de descontos, reconciliação contábil (`139 → 0`), outliers e tipagem | `src/config.py`, `src/utils/cleaning.py`, `src/data/preprocessing.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py` | `data/processed/itens_limpos.parquet` | `[x]` |
-| **2** | [2_features.md](2_features.md) | Features de produto, embalagem/multiplicador, preço, contexto temporal e catálogo oficial (`20 bases / 34 SKUs`) | `src/utils/temporal.py`, `src/data/features.py`, `notebooks/01_*.ipynb`, `tests/test_features.py` | `data/processed/pedidos_cestas.parquet`, `catalog_metadata.json` | `[x]` |
+| **1** | [1_preprocessing.md](1_preprocessing.md) | Funções puras de auditoria, validação de descontos, reconciliação contábil (`139 → 0`), outliers e tipagem | `src/config.py`, `src/utils/cleaning.py`, `src/data/preprocessing.py`, `notebooks/01_*.ipynb`, `tests/test_preprocessing.py` | `data/processed/itens_limpos.{parquet,csv}` | `[x]` |
+| **2** | [2_features.md](2_features.md) | Features de produto, embalagem/multiplicador, preço, contexto temporal e catálogo oficial (`20 bases / 34 SKUs`) | `src/utils/temporal.py`, `src/data/features.py`, `notebooks/01_*.ipynb`, `tests/test_features.py` | `data/processed/pedidos_cestas.{parquet,csv}`, `catalog_metadata.json` | `[x]` |
 | **3** | [3_eda.md](3_eda.md) | Análise exploratória e geração de 6 evidências visuais para `README.md`, notebooks e pitch | `src/data/eda.py`, `notebooks/02_*.ipynb` | `reports/figures/01_*.png` .. `06_*.png` | `[x]` |
 | **4** | [4_dataset_e_split.md](4_dataset_e_split.md) | Split **80/20** anti-leakage por `pedido_id`, expansão por subconjuntos ($2^k - 2$), modelo genérico (`dim = 99`) e tensores `X / Y` | `src/utils/baskets.py`, `src/data/dataset_builder.py`, `tests/test_dataset_split.py` | `data/processed/splits/` | `[x]` |
 | **5** | [5_modelagem_e_treino.md](5_modelagem_e_treino.md) | Baselines, MLP Multi-Task (3 cabeças, genérico), filtro de estoque Top-$K$, `BasketDAE` e Optuna | `src/modeling/baselines.py`, `src/modeling/models.py`, `src/modeling/losses.py`, `src/modeling/train.py`, `notebooks/03_*.ipynb` | Checkpoints + `07_curvas_treinamento.png` | `[x]` |
@@ -86,7 +86,9 @@ ia-g2/
 ├── data/
 │   └── processed/                     # Dados limpos e prontos (evita reprocessar o CSV a cada treino)
 │       ├── itens_limpos.parquet       # Base auditada em nível de item (preserva tipagem exata)
+│       ├── itens_limpos.csv           # Espelho CSV para visualização rápida de itens_limpos
 │       ├── pedidos_cestas.parquet     # Base consolidada em nível de pedido/cesta
+│       ├── pedidos_cestas.csv         # Espelho CSV para visualização rápida de pedidos_cestas
 │       └── splits/                    # Índices fixos 80/20 por pedido_id
 ├── notebooks/                         # Notebooks .ipynb para visualização passo a passo de cada etapa
 │   ├── 01_preprocessamento_e_features.ipynb
@@ -135,7 +137,7 @@ ia-g2/
 
 ### 2. Sobre `data/processed/` e o Formato `.parquet`
 - O diretório **`data/processed/`** armazena os conjuntos de dados intermediários já limpos e validados, mantendo [dataset.csv](../dataset.csv) intacto como fonte bruta imutável e evitando re-executar todo o ETL a cada experimento.
-- Utilizamos **Apache Parquet (`.parquet`)** em vez de `.csv` nos arquivos processados porque o Parquet **preserva 100% da tipagem** (`datetime64` com fuso horário, `int64`, `float64`, `category`, `bool`), é mais rápido para leitura/escrita no `pandas` (via `pyarrow`) e ocupa muito menos espaço. Para inspeção visual rápida, os dados são exibidos diretamente nos notebooks `.ipynb`.
+- Utilizamos **Apache Parquet (`.parquet`)** como fonte de leitura do pipeline porque preserva **100% da tipagem** (`datetime64` com fuso horário, `int64`, `float64`, `category`, `bool`), é mais rápido para leitura/escrita no `pandas` (via `pyarrow`) e ocupa menos espaço. Em paralelo, cada etapa gera automaticamente um **espelho `.csv`** (`itens_limpos.csv` e `pedidos_cestas.csv`, em UTF-8) para inspeção visual imediata no editor ou no GitHub.
 
 ### 3. Diretrizes de Reprodutibilidade
 - Ambiente Python isolado (`python3 -m venv .venv`) com dependências fixadas em `requirements.txt` (`pandas`, `numpy`, `scikit-learn`, `torch`, `optuna`, `joblib`, `plotly`, `matplotlib`, `fastapi`, `uvicorn`, `pytest`, `pyarrow`, `jupyter`), validado em **Python 3.14**.

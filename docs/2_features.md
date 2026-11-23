@@ -8,7 +8,7 @@
 | **Módulos & Notebooks** | `src/utils/temporal.py`, `src/data/features.py`, `notebooks/01_preprocessamento_e_features.ipynb` |
 | **Testes** | `tests/test_features.py` |
 | **Entrada** | `data/processed/itens_limpos.parquet` |
-| **Saídas** | `data/processed/pedidos_cestas.parquet`, `models/recommender_v1/catalog_metadata.json` |
+| **Saídas** | `data/processed/pedidos_cestas.parquet`, `data/processed/pedidos_cestas.csv`, `models/recommender_v1/catalog_metadata.json` |
 | **Status** | `[x] Concluído` |
 
 ---

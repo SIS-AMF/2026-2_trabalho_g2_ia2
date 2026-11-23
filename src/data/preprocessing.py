@@ -19,6 +19,7 @@ from src.config import (
     COLUNAS_VENDEDOR_INVALIDAS,
     DATASET_RAW_PATH,
     EVENTOS_CONSOLIDADOS,
+    ITENS_LIMPOS_CSV_PATH,
     ITENS_LIMPOS_PATH,
     LIMITE_SUBTOTAL_CONSOLIDADO,
     LIMITE_UNIDADES_CONSOLIDADO,
@@ -356,13 +357,16 @@ def salvar_artefatos_preprocessamento(
     df_limpo: pd.DataFrame,
     audit_report: dict[str, Any],
     parquet_path: Path = ITENS_LIMPOS_PATH,
+    csv_path: Path = ITENS_LIMPOS_CSV_PATH,
     audit_path: Path = PREPROCESSING_AUDIT_PATH,
 ) -> None:
-    """Persiste a base auditada em Parquet e o relatório JSON de auditoria."""
+    """Persiste a base auditada em Parquet, espelho CSV (visualização) e relatório JSON."""
     parquet_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
 
     df_limpo.to_parquet(parquet_path, engine="pyarrow", index=False)
+    df_limpo.to_csv(csv_path, index=False, encoding="utf-8")
     with audit_path.open("w", encoding="utf-8") as fp:
         json.dump(audit_report, fp, ensure_ascii=False, indent=2)
 
@@ -394,6 +398,7 @@ def main() -> None:
         f"{seg['pedidos_gratuitos']} gratuitos"
     )
     print(f"Salvo em: {ITENS_LIMPOS_PATH}")
+    print(f"Espelho CSV: {ITENS_LIMPOS_CSV_PATH}")
     print(f"Auditoria salva em: {PREPROCESSING_AUDIT_PATH}")
 
 

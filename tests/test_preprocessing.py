@@ -12,6 +12,7 @@ from src.config import (
     COLUNAS_ITENS_LIMPOS,
     COLUNAS_VENDEDOR_INVALIDAS,
     DATASET_RAW_PATH,
+    ITENS_LIMPOS_CSV_PATH,
     ITENS_LIMPOS_PATH,
     MAPA_EMBALAGEM_SEM_MULTIPLICADOR,
     MAPA_EVENTOS,
@@ -275,12 +276,18 @@ class TestIntegracaoDatasetReal:
 
     def test_artefatos_persistidos_parquet_e_audit_json(self) -> None:
         assert ITENS_LIMPOS_PATH.exists(), "Execute `python -m src.data.preprocessing` antes dos testes."
+        assert ITENS_LIMPOS_CSV_PATH.exists(), "Espelho CSV de itens_limpos ausente."
         assert PREPROCESSING_AUDIT_PATH.exists()
 
         df_parquet = pd.read_parquet(ITENS_LIMPOS_PATH)
         assert tuple(df_parquet.columns) == COLUNAS_ITENS_LIMPOS
         assert len(df_parquet) == 3813
         assert df_parquet.isna().sum().sum() == 0
+
+        df_csv = pd.read_csv(ITENS_LIMPOS_CSV_PATH)
+        assert tuple(df_csv.columns) == COLUNAS_ITENS_LIMPOS
+        assert len(df_csv) == len(df_parquet)
+        assert df_csv.isna().sum().sum() == 0
 
         # Verificar tipagem forte preservada após round-trip Parquet
         assert str(df_parquet["pedido_id"].dtype) == "string"

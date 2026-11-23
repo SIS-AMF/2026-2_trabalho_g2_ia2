@@ -16,6 +16,7 @@ import pandas as pd
 from src.config import (
     CATALOG_METADATA_PATH,
     ITENS_LIMPOS_PATH,
+    PEDIDOS_CESTAS_CSV_PATH,
     PEDIDOS_CESTAS_PATH,
 )
 from src.utils.temporal import (
@@ -253,12 +254,15 @@ def salvar_artefatos_features(
     df_cestas: pd.DataFrame,
     catalogo: dict[str, Any],
     cestas_path: Path = PEDIDOS_CESTAS_PATH,
+    cestas_csv_path: Path = PEDIDOS_CESTAS_CSV_PATH,
     catalogo_path: Path = CATALOG_METADATA_PATH,
 ) -> None:
-    """Salva `pedidos_cestas.parquet` e `catalog_metadata.json`."""
+    """Salva `pedidos_cestas.parquet`, espelho CSV (visualização) e `catalog_metadata.json`."""
     cestas_path.parent.mkdir(parents=True, exist_ok=True)
+    cestas_csv_path.parent.mkdir(parents=True, exist_ok=True)
     catalogo_path.parent.mkdir(parents=True, exist_ok=True)
     df_cestas.to_parquet(cestas_path, engine="pyarrow", index=False)
+    df_cestas.to_csv(cestas_csv_path, index=False, encoding="utf-8")
     with catalogo_path.open("w", encoding="utf-8") as fp:
         json.dump(catalogo, fp, ensure_ascii=False, indent=2)
 
@@ -282,6 +286,7 @@ def main() -> None:
         f"({n_multi_sku_varejo / n_pedidos_varejo * 100:.1f}%)"
     )
     print(f"Salvo em: {PEDIDOS_CESTAS_PATH}")
+    print(f"Espelho CSV: {PEDIDOS_CESTAS_CSV_PATH}")
     print(f"Catálogo salvo em: {CATALOG_METADATA_PATH}")
 
 

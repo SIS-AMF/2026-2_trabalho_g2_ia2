@@ -85,7 +85,7 @@ ia-g2/
 ├── requirements.txt                   # Dependências Python fixadas
 ├── dataset.csv                        # Dataset bruto original (imutável)
 ├── docs/                              # Planejamento modular das 8 etapas (ver docs/README.md)
-├── data/processed/                    # Base auditada (.parquet), cestas e splits 80/20
+├── data/processed/                    # Base auditada (.parquet + espelhos .csv), cestas e splits 80/20
 ├── notebooks/                         # Notebooks .ipynb executados passo a passo (01, 02 e 03)
 ├── src/                               # Código modular em 4 camadas + orquestrador
 │   ├── config.py                      # Constantes, seeds, mapas canônicos e caminhos

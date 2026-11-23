@@ -8,7 +8,12 @@ import math
 import pandas as pd
 import pytest
 
-from src.config import CATALOG_METADATA_PATH, ITENS_LIMPOS_PATH, PEDIDOS_CESTAS_PATH
+from src.config import (
+    CATALOG_METADATA_PATH,
+    ITENS_LIMPOS_PATH,
+    PEDIDOS_CESTAS_CSV_PATH,
+    PEDIDOS_CESTAS_PATH,
+)
 from src.data.features import executar_engenharia_features
 from src.utils.temporal import (
     calcular_economia_unitaria_pct,
@@ -97,12 +102,18 @@ class TestIntegracaoFeaturesECatalogo:
 
     def test_artefatos_persistidos_stage_2(self) -> None:
         assert PEDIDOS_CESTAS_PATH.exists(), "Execute `python -m src.data.features` antes dos testes."
+        assert PEDIDOS_CESTAS_CSV_PATH.exists(), "Espelho CSV de pedidos_cestas ausente."
         assert CATALOG_METADATA_PATH.exists()
 
         df_cestas = pd.read_parquet(PEDIDOS_CESTAS_PATH)
         assert df_cestas.isna().sum().sum() == 0
         assert df_cestas["produto_base"].nunique() == 20
         assert df_cestas["produto_com_multiplicador"].nunique() == 34
+
+        df_cestas_csv = pd.read_csv(PEDIDOS_CESTAS_CSV_PATH)
+        assert list(df_cestas_csv.columns) == list(df_cestas.columns)
+        assert len(df_cestas_csv) == len(df_cestas)
+        assert df_cestas_csv.isna().sum().sum() == 0
 
         with CATALOG_METADATA_PATH.open("r", encoding="utf-8") as fp:
             catalogo = json.load(fp)
