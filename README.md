@@ -130,11 +130,12 @@ python -m src.pipeline --only-data    # Executa apenas a camada de dados (Etapas
 
 **Opção B — Execução Individual por Etapa:**
 ```bash
-python -m src.data.preprocessing     # Etapa 1: limpeza em funções puras + itens_limpos.parquet (139 -> 0 erros)
-python -m src.data.features          # Etapa 2: features + pedidos_cestas.parquet + catalog_metadata.json
+python -m src.data.preprocessing     # Etapa 1: limpeza em funções puras + itens_limpos.{parquet,csv} (139 -> 0 erros)
+python -m src.data.features          # Etapa 2: features + pedidos_cestas.{parquet,csv} + catalog_metadata.json
 python -m src.data.eda               # Etapa 3: 6 gráficos em reports/figures/ + eda_summary.json
 python -m src.data.dataset_builder   # Etapa 4: split 80/20 anti-leakage + subconjuntos 2^k-2
-python -m src.modeling.train         # Etapas 5 & 6: Optuna (30 trials) + MLP + DAE + Baselines + avaliação (20%)
+python -m src.modeling.train         # Etapa 5: treino do FairMultiTaskRecommender + Optuna (30 trials, só treino/val)
+python -m src.modeling.evaluate      # Etapa 6: comparação no Teste 20% (Popularidade, Co-ocorrência, BasketDAE vs. MLP)
 python -m src.serving.export         # Etapa 7: exportação versionada em models/recommender_v1/
 ```
 

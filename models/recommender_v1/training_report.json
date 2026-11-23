@@ -1,7 +1,7 @@
 {
   "version": "recommender_v1",
   "model_name": "FairMultiTaskRecommender",
-  "trained_at_utc": "2026-11-23T13:13:34.266104+00:00",
+  "trained_at_utc": "2026-11-23T18:07:50.800080+00:00",
   "seed": 42,
   "model_config": {
     "in_dim": 99,

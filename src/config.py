@@ -15,6 +15,7 @@ PEDIDOS_CESTAS_CSV_PATH: Path = DATA_PROCESSED_DIR / "pedidos_cestas.csv"
 SPLITS_DIR: Path = DATA_PROCESSED_DIR / "splits"
 
 MODELS_DIR: Path = PROJECT_ROOT / "models"
+BEST_CHECKPOINT_PATH: Path = MODELS_DIR / "best_checkpoint.pt"
 RECOMMENDER_ARTIFACT_DIR: Path = MODELS_DIR / "recommender_v1"
 CATALOG_METADATA_PATH: Path = RECOMMENDER_ARTIFACT_DIR / "catalog_metadata.json"
 MODEL_WEIGHTS_PATH: Path = RECOMMENDER_ARTIFACT_DIR / "model_weights.pt"
@@ -28,6 +29,7 @@ FIGURES_DIR: Path = REPORTS_DIR / "figures"
 PREPROCESSING_AUDIT_PATH: Path = REPORTS_DIR / "preprocessing_audit.json"
 EDA_SUMMARY_PATH: Path = REPORTS_DIR / "eda_summary.json"
 EVALUATION_SUMMARY_PATH: Path = REPORTS_DIR / "evaluation_summary.csv"
+EVALUATION_REPORT_PATH: Path = REPORTS_DIR / "evaluation_report.json"
 QUALITATIVE_CASES_PATH: Path = REPORTS_DIR / "qualitative_cases.md"
 
 # Reprodutibilidade e tolerâncias

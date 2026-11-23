@@ -1,12 +1,23 @@
-"""Etapa 6 — Orquestração de Avaliação Top-K, Gráficos Comparativos e Relatório Qualitativo.
+"""Etapa 6 — Avaliação Comparativa no Teste Hold-Out (20%) e Relatórios.
 
-Utiliza as funções puras de ranking e métricas de `src.utils.ranking` para avaliar
-modelos no conjunto de Teste Hold-Out (20%) e gerar os artefatos em `reports/`.
+Responsabilidade exclusiva deste módulo:
+- Carregar o modelo principal já treinado (`models/best_checkpoint.pt`).
+- Ajustar os 3 modelos comparativos (benchmarks de referência):
+  1. `PopularityBaseline` (popularidade global no treino)
+  2. `CooccurrenceBaseline` (matriz condicional P(s_j | s_i) no treino)
+  3. `BasketDAE` (Denoising Autoencoder — comparativo neural, Slide 42)
+- Avaliar os 4 modelos lado a lado sobre o conjunto de Teste Hold-Out (20%)
+  utilizando as métricas puras de `src.utils.ranking`.
+- Persistir `reports/evaluation_summary.csv`, `reports/evaluation_report.json`,
+  `reports/figures/08_comparacao_modelos.png` e `reports/qualitative_cases.md`.
 """
 
 from __future__ import annotations
 
+import copy
+import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,18 +26,126 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 from src.config import (
+    BEST_CHECKPOINT_PATH,
+    CATALOG_METADATA_PATH,
+    EVALUATION_REPORT_PATH,
     EVALUATION_SUMMARY_PATH,
     FIGURES_DIR,
+    PEDIDOS_CESTAS_PATH,
     QUALITATIVE_CASES_PATH,
+    SEED,
+    SPLITS_DIR,
 )
+from src.data.dataset_builder import carregar_splits
+from src.modeling.baselines import CooccurrenceBaseline, PopularityBaseline
+from src.modeling.models import BasketDAE, FairMultiTaskRecommender
+from src.modeling.train import fixar_seeds, prever_mlp_multitask
 from src.utils.ranking import (
     aplicar_mascaras_ranking,
     calcular_metricas_quantidade,
     calcular_metricas_ranking,
     projetar_scores_sku_para_base,
 )
+
+
+# =============================================================================
+# MODELO COMPARATIVO NEURAL (BENCHMARK): DENOISING AUTOENCODER (BasketDAE)
+# =============================================================================
+
+
+def treinar_basket_dae(
+    train_arr: dict[str, np.ndarray],
+    val_arr: dict[str, np.ndarray],
+    n_skus: int = 34,
+    max_epochs: int = 100,
+    patience: int = 16,
+    seed: int = SEED,
+) -> tuple[BasketDAE, dict[str, Any]]:
+    """Treina o Denoising Autoencoder (`BasketDAE`) usado como benchmark comparativo."""
+    fixar_seeds(seed)
+    model = BasketDAE(
+        n_skus=n_skus,
+        n_time=6,
+        hidden_dim=64,
+        bottleneck_dim=24,
+        dropout=0.25,
+        masking_noise=0.35,
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1.5e-3, weight_decay=1e-4)
+
+    # Reconstrói a cesta completa (entrada + alvo) a partir da entrada corrompida por ruído
+    x_sku_train = train_arr["X"][:, :n_skus]
+    x_time_train = train_arr["X"][:, -6:]
+    y_full_train = np.clip(x_sku_train + train_arr["y_sku"], 0.0, 1.0).astype(np.float32)
+
+    ds = TensorDataset(
+        torch.from_numpy(y_full_train),
+        torch.from_numpy(x_time_train),
+        torch.from_numpy(y_full_train),
+    )
+    loader = DataLoader(ds, batch_size=64, shuffle=True)
+
+    val_x_sku = torch.from_numpy(val_arr["X"][:, :n_skus])
+    val_x_time = torch.from_numpy(val_arr["X"][:, -6:])
+
+    best_ndcg = -1.0
+    best_state = copy.deepcopy(model.state_dict())
+    no_improve = 0
+    best_epoch = 0
+
+    for epoch in range(1, max_epochs + 1):
+        model.train()
+        for bx_full, bx_time, by_full in loader:
+            if len(bx_full) < 2:
+                continue
+            optimizer.zero_grad()
+            logits = model(bx_full, bx_time)
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, by_full)
+            loss.backward()
+            optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            v_logits = model(val_x_sku, val_x_time)
+            v_scores = torch.sigmoid(v_logits).numpy()
+            v_masked = aplicar_mascaras_ranking(v_scores, val_arr["mask_sku"])
+            v_ndcg = calcular_metricas_ranking(v_masked, val_arr["y_sku"], ks=(1, 3, 5))["ndcg@3"]
+
+        if v_ndcg > best_ndcg + 1e-5:
+            best_ndcg = v_ndcg
+            best_epoch = epoch
+            best_state = copy.deepcopy(model.state_dict())
+            no_improve = 0
+        else:
+            no_improve += 1
+            if no_improve >= patience:
+                break
+
+    model.load_state_dict(best_state)
+    return model, {"best_val_ndcg@3": best_ndcg, "best_epoch": best_epoch}
+
+
+@torch.no_grad()
+def prever_dae(
+    model: BasketDAE,
+    X: np.ndarray,
+    n_skus: int = 34,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Executa inferência em lote para o benchmark `BasketDAE`."""
+    model.eval()
+    logits = model(torch.from_numpy(X[:, :n_skus]), torch.from_numpy(X[:, -6:]))
+    scores = torch.sigmoid(logits).numpy().astype(np.float32)
+    qty_pred = np.full((len(X), n_skus), np.log1p(1.0), dtype=np.float32)
+    return scores, qty_pred
+
+
+# =============================================================================
+# AVALIAÇÃO QUANTITATIVA, GRÁFICO COMPARATIVO E CASOS QUALITATIVOS
+# =============================================================================
 
 
 def avaliar_modelo_completo(
@@ -167,7 +286,10 @@ def gerar_relatorio_qualitativo(
         top3 = np.argsort(-masked[idx])[:3].tolist()
         acertou = "ACERTO NO TOP-3" if tgt_s in top3 else "FORA DO TOP-3"
 
-        linhas.append(f"## Caso {num} — Pedido `{meta['pedido_id'][:8]}...` ({dias[meta['dia_semana']]}, {meta['hora']:02d}h) — {acertou}")
+        linhas.append(
+            f"## Caso {num} — Pedido `{meta['pedido_id'][:8]}...` "
+            f"({dias[meta['dia_semana']]}, {meta['hora']:02d}h) — {acertou}"
+        )
         linhas.append(f"- **Carrinho de Entrada:** {entrada_txt}")
         linhas.append(
             f"- **Item Real Comprado (Ground Truth):** `{tgt_info['display_name']}` "
@@ -199,3 +321,112 @@ def salvar_resumo_avaliacao(
     df_eval.to_csv(csv_path, index=False)
     gerar_grafico_comparacao_modelos(df_eval)
     return df_eval
+
+
+def executar_avaliacao_comparativa(
+    checkpoint_path: Path = BEST_CHECKPOINT_PATH,
+    evaluation_report_path: Path = EVALUATION_REPORT_PATH,
+    seed: int = SEED,
+) -> dict[str, Any]:
+    """Avalia o modelo principal salvo contra os 3 benchmarks no Teste Hold-Out (20%)."""
+    df_cestas = pd.read_parquet(PEDIDOS_CESTAS_PATH)
+    with CATALOG_METADATA_PATH.open("r", encoding="utf-8") as fp:
+        catalogo = json.load(fp)
+    bundle = carregar_splits(SPLITS_DIR)
+
+    n_skus = int(catalogo["n_skus"])
+    sku_to_base_idx = np.array([s["base_id"] for s in catalogo["skus"]], dtype=np.int64)
+
+    # 1. Carregar modelo principal já treinado (FairMultiTaskRecommender)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    cfg = checkpoint["model_config"]
+    mlp_model = FairMultiTaskRecommender(
+        in_dim=int(cfg["in_dim"]),
+        hidden_dims=tuple(cfg["hidden_dims"]),
+        n_bases=int(cfg["n_bases"]),
+        n_skus=int(cfg["n_skus"]),
+        dropout=float(cfg["dropout"]),
+    )
+    mlp_model.load_state_dict(checkpoint["model_state_dict"])
+    mlp_model.eval()
+    lambda_hier = float(checkpoint["hparams"]["lambda_hier"])
+
+    # 2. Ajustar os 3 modelos comparativos (usando apenas treino / validação)
+    pop_model = PopularityBaseline(n_skus=n_skus).fit(df_cestas, bundle["splits"]["train_ids"])
+    cooc_model = CooccurrenceBaseline(n_skus=n_skus, smoothing=1.0).fit(
+        df_cestas, bundle["splits"]["train_ids"]
+    )
+    dae_model, dae_info = treinar_basket_dae(
+        train_arr=bundle["train"],
+        val_arr=bundle["val"],
+        n_skus=n_skus,
+        seed=seed,
+    )
+
+    # 3. Avaliação imparcial no conjunto de Teste Hold-Out (20%)
+    test_arr = bundle["test"]
+    pop_scores, pop_qty = pop_model.predict_scores(test_arr["X"], test_arr["mask_sku"])
+    cooc_scores, cooc_qty = cooc_model.predict_scores(test_arr["X"], test_arr["mask_sku"])
+    dae_scores, dae_qty = prever_dae(dae_model, test_arr["X"], n_skus=n_skus)
+    mlp_scores, mlp_qty = prever_mlp_multitask(
+        mlp_model, test_arr["X"], sku_to_base_idx, lambda_hier
+    )
+
+    resultados = [
+        avaliar_modelo_completo("Baseline 1: Popularidade", pop_scores, pop_qty, test_arr, catalogo),
+        avaliar_modelo_completo("Baseline 2: Co-ocorrência", cooc_scores, cooc_qty, test_arr, catalogo),
+        avaliar_modelo_completo("BasketDAE (Autoencoder)", dae_scores, dae_qty, test_arr, catalogo),
+        avaliar_modelo_completo("MLP Multi-Task (Principal)", mlp_scores, mlp_qty, test_arr, catalogo),
+    ]
+    df_eval = salvar_resumo_avaliacao(resultados)
+
+    gerar_relatorio_qualitativo(
+        scores_sku=mlp_scores,
+        pred_qty_log1p=mlp_qty,
+        test_meta=bundle["test_meta"],
+        mask_sku=test_arr["mask_sku"],
+        catalogo=catalogo,
+    )
+
+    mlp_eval = next(
+        (r for r in resultados if "MLP Multi-Task" in r["modelo"]),
+        resultados[-1],
+    )
+    report = {
+        "evaluated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "seed": seed,
+        "dae_info": dae_info,
+        "principal_test_metrics": mlp_eval,
+        "all_models_test_evaluation": resultados,
+    }
+    evaluation_report_path.parent.mkdir(parents=True, exist_ok=True)
+    with evaluation_report_path.open("w", encoding="utf-8") as fp:
+        json.dump(report, fp, ensure_ascii=False, indent=2)
+
+    return {"report": report, "df_eval": df_eval}
+
+
+def main() -> None:
+    """Ponto de entrada CLI (`python -m src.modeling.evaluate`)."""
+    out = executar_avaliacao_comparativa(seed=SEED)
+    print("=== ETAPA 6 — AVALIAÇÃO COMPARATIVA NO TESTE HOLD-OUT (20%) ===")
+    cols = [
+        "modelo",
+        "sku_hit_rate@1",
+        "sku_hit_rate@3",
+        "sku_ndcg@3",
+        "sku_mrr",
+        "sku_coverage@3",
+        "base_hit_rate@3",
+        "qty_mae",
+        "qty_exact_acc",
+    ]
+    print(out["df_eval"][cols].to_string(index=False))
+    print(f"\nResumo CSV: {EVALUATION_SUMMARY_PATH}")
+    print(f"Relatório JSON: {EVALUATION_REPORT_PATH}")
+    print(f"Gráfico comparativo: {FIGURES_DIR / '08_comparacao_modelos.png'}")
+    print(f"Casos qualitativos: {QUALITATIVE_CASES_PATH}")
+
+
+if __name__ == "__main__":
+    main()

@@ -11,9 +11,10 @@ import joblib
 import torch
 
 from src.config import (
+    BEST_CHECKPOINT_PATH,
     CATALOG_METADATA_PATH,
+    EVALUATION_REPORT_PATH,
     MODEL_WEIGHTS_PATH,
-    MODELS_DIR,
     PREPROCESSING_ARTIFACTS_PATH,
     RECOMMENDER_ARTIFACT_DIR,
     SPLITS_DIR,
@@ -23,7 +24,8 @@ from src.modeling.models import FairMultiTaskRecommender
 
 
 def exportar_pacote_modelo(
-    checkpoint_path: Path = MODELS_DIR / "best_checkpoint.pt",
+    checkpoint_path: Path = BEST_CHECKPOINT_PATH,
+    evaluation_report_path: Path = EVALUATION_REPORT_PATH,
     splits_dir: Path = SPLITS_DIR,
     catalogo_path: Path = CATALOG_METADATA_PATH,
     artifact_dir: Path = RECOMMENDER_ARTIFACT_DIR,
@@ -76,11 +78,19 @@ def exportar_pacote_modelo(
     if catalogo_path.resolve() != cat_out.resolve():
         shutil.copy2(catalogo_path, cat_out)
 
-    # 5. Relatório completo de treino e métricas (`training_report.json`)
-    mlp_eval = next(
-        (r for r in checkpoint["test_evaluation"] if "MLP Multi-Task" in r["modelo"]),
-        checkpoint["test_evaluation"][-1],
-    )
+    # 4. Relatório completo de treino e métricas (`training_report.json`)
+    if evaluation_report_path.exists():
+        with evaluation_report_path.open("r", encoding="utf-8") as fp:
+            eval_doc = json.load(fp)
+        test_evaluation = eval_doc["all_models_test_evaluation"]
+        mlp_eval = eval_doc["principal_test_metrics"]
+    else:
+        test_evaluation = checkpoint["test_evaluation"]
+        mlp_eval = next(
+            (r for r in test_evaluation if "MLP Multi-Task" in r["modelo"]),
+            test_evaluation[-1],
+        )
+
     training_report: dict[str, Any] = {
         "version": "recommender_v1",
         "model_name": "FairMultiTaskRecommender",
@@ -92,7 +102,7 @@ def exportar_pacote_modelo(
         "best_val_ndcg@3": checkpoint["best_val_ndcg@3"],
         "split_summary": checkpoint["split_summary"],
         "principal_test_metrics": mlp_eval,
-        "all_models_test_evaluation": checkpoint["test_evaluation"],
+        "all_models_test_evaluation": test_evaluation,
         "history": checkpoint["history"],
     }
     report_out = artifact_dir / TRAINING_REPORT_PATH.name

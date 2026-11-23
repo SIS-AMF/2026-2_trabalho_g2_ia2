@@ -1,10 +1,20 @@
-"""Etapa 5 & 6 — Treinamento, Ajuste de Hiperparâmetros (Optuna) e Avaliação no Teste 20%.
+"""Etapa 5 — Treinamento e Ajuste de Hiperparâmetros do Modelo Principal.
 
-Treina e compara:
-1. Baseline 1 — Popularidade Global
-2. Baseline 2 — Co-ocorrência / Lift
-3. BasketDAE — Denoising Autoencoder (Slide 42)
-4. FairMultiTaskRecommender — MLP Multi-Task Genérico (3 cabeças) otimizado com Optuna
+Responsabilidade exclusiva deste módulo:
+- Treinar a rede neural principal `FairMultiTaskRecommender` (MLP Multi-Task de 3 cabeças)
+  utilizando APENAS os conjuntos de Treino e Validação (nunca toca no Teste 20%).
+- Executar a busca de hiperparâmetros com Optuna (`val_ndcg@3`).
+- Salvar o gráfico de convergência (`07_curvas_treinamento.png`) e o checkpoint
+  vencedor (`models/best_checkpoint.pt`).
+
+Componentes explícitos do treinamento:
+- Arquitetura + Regularização estrutural (`BatchNorm1d`, `Dropout`): `src/modeling/models.py`
+- Função de Erro composta mascarada (`MultiTaskRecommendationLoss`): `src/modeling/losses.py`
+- Otimizador + Regularizador L2: `torch.optim.AdamW(..., weight_decay=...)`
+- Controle de convergência: `ReduceLROnPlateau` + `clip_grad_norm_` + `EarlyStopping`
+
+A comparação com modelos alternativos (Baselines + BasketDAE) e a avaliação no
+Teste Hold-Out (20%) ficam isoladas em `src/modeling/evaluate.py`.
 """
 
 from __future__ import annotations
@@ -26,22 +36,16 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.config import (
+    BEST_CHECKPOINT_PATH,
     CATALOG_METADATA_PATH,
     FIGURES_DIR,
     MODELS_DIR,
-    PEDIDOS_CESTAS_PATH,
     SEED,
     SPLITS_DIR,
 )
 from src.data.dataset_builder import carregar_splits
-from src.modeling.baselines import CooccurrenceBaseline, PopularityBaseline
-from src.modeling.evaluate import (
-    avaliar_modelo_completo,
-    gerar_relatorio_qualitativo,
-    salvar_resumo_avaliacao,
-)
 from src.modeling.losses import MultiTaskRecommendationLoss, calcular_pos_weights
-from src.modeling.models import BasketDAE, FairMultiTaskRecommender
+from src.modeling.models import FairMultiTaskRecommender
 from src.utils.ranking import (
     aplicar_mascaras_ranking,
     calcular_metricas_ranking,
@@ -50,6 +54,7 @@ from src.utils.ranking import (
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+# Arquiteturas candidatas do backbone MLP avaliadas pelo Optuna
 ARCH_OPTIONS: dict[str, tuple[int, ...]] = {
     "64_32": (64, 32),
     "128_64": (128, 64),
@@ -58,6 +63,7 @@ ARCH_OPTIONS: dict[str, tuple[int, ...]] = {
 
 
 def fixar_seeds(seed: int = SEED) -> None:
+    """Fixa as seeds de `random`, `numpy` e `torch` para reprodutibilidade."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -86,7 +92,7 @@ def prever_mlp_multitask(
     sku_to_base_idx: np.ndarray,
     lambda_hier: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Executa inferência em lote retornando (scores_sku, pred_qty_log1p)."""
+    """Executa inferência em lote retornando `(scores_sku, pred_qty_log1p)`."""
     model.eval()
     x_t = torch.from_numpy(X)
     logits_b, logits_s, pred_q = model(x_t)
@@ -110,10 +116,13 @@ def treinar_mlp_multitask(
     patience: int = 18,
     seed: int = SEED,
 ) -> dict[str, Any]:
-    """Treina um `FairMultiTaskRecommender` com AdamW, ReduceLROnPlateau e EarlyStopping."""
+    """Treina o `FairMultiTaskRecommender` sobre Treino/Validação com Early Stopping."""
     fixar_seeds(seed)
     sku_to_base_idx = np.array([s["base_id"] for s in catalogo["skus"]], dtype=np.int64)
 
+    # -------------------------------------------------------------------------
+    # 1. ARQUITETURA DA REDE NEURAL (inclui regularização BatchNorm1d + Dropout)
+    # -------------------------------------------------------------------------
     model = FairMultiTaskRecommender(
         in_dim=int(train_arr["X"].shape[1]),
         hidden_dims=hparams["hidden_dims"],
@@ -122,29 +131,40 @@ def treinar_mlp_multitask(
         dropout=float(hparams["dropout"]),
     )
 
+    # -------------------------------------------------------------------------
+    # 2. FUNÇÃO DE ERRO COMPOSTA MASCARADA (Loss das 3 cabeças)
+    # -------------------------------------------------------------------------
     pw_cap = float(hparams.get("pos_weight_cap", 2.5))
     pw_base = calcular_pos_weights(train_arr["y_base"], max_weight=pw_cap)
     pw_sku = calcular_pos_weights(train_arr["y_sku"], max_weight=pw_cap)
 
-    criterion = MultiTaskRecommendationLoss(
+    loss_fn = MultiTaskRecommendationLoss(
         w_base=float(hparams["w_base"]),
         w_sku=float(hparams["w_sku"]),
         w_qty=float(hparams["w_qty"]),
         pos_weight_base=pw_base,
         pos_weight_sku=pw_sku,
     )
+
+    # -------------------------------------------------------------------------
+    # 3. OTIMIZADOR (AdamW) + REGULARIZADOR L2 (weight_decay) + SCHEDULER
+    # -------------------------------------------------------------------------
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=float(hparams["lr"]),
-        weight_decay=float(hparams["weight_decay"]),
+        weight_decay=float(hparams["weight_decay"]),  # Regularização L2 nos pesos
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", factor=0.5, patience=6, min_lr=1e-5
     )
 
-    train_loader = _fazer_dataloader(train_arr, batch_size=int(hparams["batch_size"]), shuffle=True)
+    # -------------------------------------------------------------------------
+    # 4. LOOP DE TREINAMENTO (Backpropagation + Gradient Clipping + Early Stopping)
+    # -------------------------------------------------------------------------
+    train_loader = _fazer_dataloader(
+        train_arr, batch_size=int(hparams["batch_size"]), shuffle=True
+    )
 
-    # Tensores de validação para cálculo rápido da val_loss por época
     val_x = torch.from_numpy(val_arr["X"])
     val_yb = torch.from_numpy(val_arr["y_base"])
     val_ys = torch.from_numpy(val_arr["y_sku"])
@@ -157,20 +177,20 @@ def treinar_mlp_multitask(
     best_state = copy.deepcopy(model.state_dict())
     no_improve = 0
     history: list[dict[str, float]] = []
-
     lambda_hier = float(hparams["lambda_hier"])
 
     for epoch in range(1, max_epochs + 1):
+        # 4.1 Fase de treino (Dropout e BatchNorm ativos)
         model.train()
         train_loss_sum = 0.0
         n_batches = 0
 
         for bx, byb, bys, byq, bmb, bms in train_loader:
             if len(bx) < 2:
-                continue  # BatchNorm1d requer batch >= 2 durante treino
+                continue  # BatchNorm1d requer batch >= 2 durante o treino
             optimizer.zero_grad()
             lb, ls, pq = model(bx)
-            loss, _ = criterion(lb, ls, pq, byb, bys, byq, bmb, bms)
+            loss, _ = loss_fn(lb, ls, pq, byb, bys, byq, bmb, bms)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
@@ -179,14 +199,18 @@ def treinar_mlp_multitask(
 
         avg_train_loss = train_loss_sum / max(1, n_batches)
 
-        # Avaliação na validação
+        # 4.2 Avaliação na Validação (sem gradiente e sem tocar no Teste 20%)
         model.eval()
         with torch.no_grad():
             vlb, vls, vpq = model(val_x)
-            val_loss_t, val_breakdown = criterion(vlb, vls, vpq, val_yb, val_ys, val_yq, val_mb, val_ms)
+            val_loss_t, val_breakdown = loss_fn(
+                vlb, vls, vpq, val_yb, val_ys, val_yq, val_mb, val_ms
+            )
             v_probs_b = torch.sigmoid(vlb).numpy()
             v_probs_s = torch.sigmoid(vls).numpy()
-            v_scores = combinar_scores_hierarquicos(v_probs_s, v_probs_b, sku_to_base_idx, lambda_hier)
+            v_scores = combinar_scores_hierarquicos(
+                v_probs_s, v_probs_b, sku_to_base_idx, lambda_hier
+            )
             v_masked = aplicar_mascaras_ranking(v_scores, val_arr["mask_sku"])
             v_metrics = calcular_metricas_ranking(v_masked, val_arr["y_sku"], ks=(1, 3, 5))
 
@@ -208,6 +232,7 @@ def treinar_mlp_multitask(
             }
         )
 
+        # 4.3 Early Stopping (regularização temporal — guarda pesos da melhor época)
         if val_ndcg3 > best_val_ndcg + 1e-5:
             best_val_ndcg = val_ndcg3
             best_epoch = epoch
@@ -228,84 +253,6 @@ def treinar_mlp_multitask(
     }
 
 
-def treinar_basket_dae(
-    train_arr: dict[str, np.ndarray],
-    val_arr: dict[str, np.ndarray],
-    n_skus: int = 34,
-    max_epochs: int = 100,
-    patience: int = 16,
-    seed: int = SEED,
-) -> tuple[BasketDAE, dict[str, Any]]:
-    """Treina o Denoising Autoencoder (BasketDAE) comparativo."""
-    fixar_seeds(seed)
-    model = BasketDAE(n_skus=n_skus, n_time=6, hidden_dim=64, bottleneck_dim=24, dropout=0.25, masking_noise=0.35)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1.5e-3, weight_decay=1e-4)
-
-    # No DAE, reconstruímos a cesta completa (entrada + alvo) a partir da entrada corrompida
-    x_sku_train = train_arr["X"][:, :n_skus]
-    x_time_train = train_arr["X"][:, -6:]
-    y_full_train = np.clip(x_sku_train + train_arr["y_sku"], 0.0, 1.0).astype(np.float32)
-
-    ds = TensorDataset(
-        torch.from_numpy(y_full_train),
-        torch.from_numpy(x_time_train),
-        torch.from_numpy(y_full_train),
-    )
-    loader = DataLoader(ds, batch_size=64, shuffle=True)
-
-    val_x_sku = torch.from_numpy(val_arr["X"][:, :n_skus])
-    val_x_time = torch.from_numpy(val_arr["X"][:, -6:])
-
-    best_ndcg = -1.0
-    best_state = copy.deepcopy(model.state_dict())
-    no_improve = 0
-    best_epoch = 0
-
-    for epoch in range(1, max_epochs + 1):
-        model.train()
-        for bx_full, bx_time, by_full in loader:
-            if len(bx_full) < 2:
-                continue
-            optimizer.zero_grad()
-            logits = model(bx_full, bx_time)
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, by_full)
-            loss.backward()
-            optimizer.step()
-
-        model.eval()
-        with torch.no_grad():
-            v_logits = model(val_x_sku, val_x_time)
-            v_scores = torch.sigmoid(v_logits).numpy()
-            v_masked = aplicar_mascaras_ranking(v_scores, val_arr["mask_sku"])
-            v_ndcg = calcular_metricas_ranking(v_masked, val_arr["y_sku"], ks=(1, 3, 5))["ndcg@3"]
-
-        if v_ndcg > best_ndcg + 1e-5:
-            best_ndcg = v_ndcg
-            best_epoch = epoch
-            best_state = copy.deepcopy(model.state_dict())
-            no_improve = 0
-        else:
-            no_improve += 1
-            if no_improve >= patience:
-                break
-
-    model.load_state_dict(best_state)
-    return model, {"best_val_ndcg@3": best_ndcg, "best_epoch": best_epoch}
-
-
-@torch.no_grad()
-def prever_dae(
-    model: BasketDAE,
-    X: np.ndarray,
-    n_skus: int = 34,
-) -> tuple[np.ndarray, np.ndarray]:
-    model.eval()
-    logits = model(torch.from_numpy(X[:, :n_skus]), torch.from_numpy(X[:, -6:]))
-    scores = torch.sigmoid(logits).numpy().astype(np.float32)
-    qty_pred = np.full((len(X), n_skus), np.log1p(1.0), dtype=np.float32)
-    return scores, qty_pred
-
-
 def executar_busca_optuna(
     train_arr: dict[str, np.ndarray],
     val_arr: dict[str, np.ndarray],
@@ -313,7 +260,7 @@ def executar_busca_optuna(
     n_trials: int = 30,
     seed: int = SEED,
 ) -> tuple[dict[str, Any], pd.DataFrame]:
-    """Busca de hiperparâmetros com Optuna otimizando `val_ndcg@3` (SKU)."""
+    """Busca de hiperparâmetros com Optuna otimizando `val_ndcg@3` (validação)."""
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
 
@@ -412,34 +359,17 @@ def gerar_grafico_curvas_treinamento(
     plt.close(fig)
 
 
-def executar_pipeline_treino_e_avaliacao(
+def treinar_modelo_principal(
     n_trials: int = 30,
     seed: int = SEED,
+    checkpoint_path: Path = BEST_CHECKPOINT_PATH,
 ) -> dict[str, Any]:
-    """Executa tuning Optuna, treino dos 4 modelos, avaliação Hold-Out 20% e salva checkpoint."""
-    df_cestas = pd.read_parquet(PEDIDOS_CESTAS_PATH)
+    """Executa tuning Optuna e treino final do `FairMultiTaskRecommender` (sem tocar no Teste)."""
     with CATALOG_METADATA_PATH.open("r", encoding="utf-8") as fp:
         catalogo = json.load(fp)
     bundle = carregar_splits(SPLITS_DIR)
 
-    n_skus = int(catalogo["n_skus"])
-    sku_to_base_idx = np.array([s["base_id"] for s in catalogo["skus"]], dtype=np.int64)
-
-    # 1. Baselines (ajustados apenas no conjunto de treino)
-    pop_model = PopularityBaseline(n_skus=n_skus).fit(df_cestas, bundle["splits"]["train_ids"])
-    cooc_model = CooccurrenceBaseline(n_skus=n_skus, smoothing=1.0).fit(
-        df_cestas, bundle["splits"]["train_ids"]
-    )
-
-    # 2. Denoising Autoencoder comparativo (BasketDAE)
-    dae_model, dae_info = treinar_basket_dae(
-        train_arr=bundle["train"],
-        val_arr=bundle["val"],
-        n_skus=n_skus,
-        seed=seed,
-    )
-
-    # 3. Busca de hiperparâmetros com Optuna para o FairMultiTaskRecommender
+    # 1. Busca de hiperparâmetros na validação (Optuna)
     best_hparams, df_trials = executar_busca_optuna(
         train_arr=bundle["train"],
         val_arr=bundle["val"],
@@ -450,7 +380,7 @@ def executar_pipeline_treino_e_avaliacao(
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     df_trials.to_csv(MODELS_DIR / "optuna_trials.csv", index=False)
 
-    # 4. Treino final do melhor MLP Multi-Task com registro completo de curvas
+    # 2. Treino final da melhor configuração com registro completo de curvas
     mlp_res = treinar_mlp_multitask(
         train_arr=bundle["train"],
         val_arr=bundle["val"],
@@ -463,34 +393,7 @@ def executar_pipeline_treino_e_avaliacao(
     mlp_model: FairMultiTaskRecommender = mlp_res["model"]
     gerar_grafico_curvas_treinamento(mlp_res["history"], mlp_res["best_epoch"])
 
-    # 5. Avaliação imparcial no conjunto de Teste Hold-Out (20%)
-    test_arr = bundle["test"]
-
-    pop_scores, pop_qty = pop_model.predict_scores(test_arr["X"], test_arr["mask_sku"])
-    cooc_scores, cooc_qty = cooc_model.predict_scores(test_arr["X"], test_arr["mask_sku"])
-    dae_scores, dae_qty = prever_dae(dae_model, test_arr["X"], n_skus=n_skus)
-    mlp_scores, mlp_qty = prever_mlp_multitask(
-        mlp_model, test_arr["X"], sku_to_base_idx, best_hparams["lambda_hier"]
-    )
-
-    resultados = [
-        avaliar_modelo_completo("Baseline 1: Popularidade", pop_scores, pop_qty, test_arr, catalogo),
-        avaliar_modelo_completo("Baseline 2: Co-ocorrência", cooc_scores, cooc_qty, test_arr, catalogo),
-        avaliar_modelo_completo("BasketDAE (Autoencoder)", dae_scores, dae_qty, test_arr, catalogo),
-        avaliar_modelo_completo("MLP Multi-Task (Principal)", mlp_scores, mlp_qty, test_arr, catalogo),
-    ]
-    df_eval = salvar_resumo_avaliacao(resultados)
-
-    # Relatório qualitativo no conjunto de teste (8 casos reais)
-    gerar_relatorio_qualitativo(
-        scores_sku=mlp_scores,
-        pred_qty_log1p=mlp_qty,
-        test_meta=bundle["test_meta"],
-        mask_sku=test_arr["mask_sku"],
-        catalogo=catalogo,
-    )
-
-    # Salvar checkpoint completo intermediário para a Etapa 7 (Exportação)
+    # 3. Salvar checkpoint do modelo principal (lido por evaluate.py e export.py)
     checkpoint = {
         "model_state_dict": mlp_model.state_dict(),
         "model_config": mlp_model.get_config(),
@@ -501,37 +404,29 @@ def executar_pipeline_treino_e_avaliacao(
         "best_epoch": mlp_res["best_epoch"],
         "best_val_ndcg@3": mlp_res["best_val_ndcg@3"],
         "history": mlp_res["history"],
-        "dae_info": dae_info,
-        "test_evaluation": resultados,
         "split_summary": bundle["summary"],
         "seed": seed,
         "trained_at_utc": datetime.now(timezone.utc).isoformat(),
     }
-    torch.save(checkpoint, MODELS_DIR / "best_checkpoint.pt")
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(checkpoint, checkpoint_path)
 
-    return {"checkpoint": checkpoint, "df_eval": df_eval, "df_trials": df_trials}
+    return {"checkpoint": checkpoint, "df_trials": df_trials}
 
 
 def main() -> None:
     """Ponto de entrada CLI (`python -m src.modeling.train`)."""
-    out = executar_pipeline_treino_e_avaliacao(n_trials=30, seed=SEED)
-    print("=== ETAPAS 5 & 6 — TREINO, TUNING E AVALIAÇÃO CONCLUÍDOS ===")
-    print("\nMelhores hiperparâmetros (Optuna):")
-    print(json.dumps(out["checkpoint"]["hparams"], indent=2))
-    print(f"\nMelhor época (Early Stopping): {out['checkpoint']['best_epoch']}")
-    print("\n=== TABELA COMPARATIVA NO TESTE HOLD-OUT (20%) ===")
-    cols = [
-        "modelo",
-        "sku_hit_rate@1",
-        "sku_hit_rate@3",
-        "sku_ndcg@3",
-        "sku_mrr",
-        "sku_coverage@3",
-        "base_hit_rate@3",
-        "qty_mae",
-        "qty_exact_acc",
-    ]
-    print(out["df_eval"][cols].to_string(index=False))
+    out = treinar_modelo_principal(n_trials=30, seed=SEED)
+    ckpt = out["checkpoint"]
+    print("=== ETAPA 5 — TREINAMENTO DO MODELO PRINCIPAL CONCLUÍDO ===")
+    print("\nMelhores hiperparâmetros (Optuna — Validação):")
+    print(json.dumps(ckpt["hparams"], indent=2))
+    print(
+        f"\nMelhor época (Early Stopping): {ckpt['best_epoch']} "
+        f"| Val NDCG@3: {ckpt['best_val_ndcg@3']:.4f}"
+    )
+    print(f"Checkpoint salvo em: {BEST_CHECKPOINT_PATH}")
+    print(f"Curvas salvas em: {FIGURES_DIR / '07_curvas_treinamento.png'}")
 
 
 if __name__ == "__main__":

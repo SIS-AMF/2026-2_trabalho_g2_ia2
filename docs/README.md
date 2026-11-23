@@ -111,8 +111,8 @@ ia-g2/
 │   │   ├── baselines.py               # Etapa 5: Popularidade e Co-ocorrência/Lift
 │   │   ├── models.py                  # Etapa 5: FairMultiTaskRecommender (MLP) e BasketDAE
 │   │   ├── losses.py                  # Etapa 5: MultiTaskRecommendationLoss mascarada
-│   │   ├── evaluate.py                # Etapa 6: avaliação completa, gráfico comparativo e casos reais
-│   │   └── train.py                   # Etapa 5 & 6: treino, early stopping e busca Optuna
+│   │   ├── evaluate.py                # Etapa 6: benchmarks (Baselines + DAE) e avaliação comparativa no Teste 20%
+│   │   └── train.py                   # Etapa 5: treino dedicado do MLP Multi-Task, early stopping e busca Optuna
 │   └── serving/                       # Camada 4: exportação e inferência em produção
 │       ├── export.py                  # Etapa 7: serialização versionada do modelo e artefatos
 │       └── inference.py               # Etapa 7: RecommenderService (inferência + filtro de estoque)

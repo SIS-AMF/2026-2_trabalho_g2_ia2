@@ -1,8 +1,8 @@
-"""Orquestrador ponta-a-ponta do pipeline de dados, treinamento e exportação.
+"""Orquestrador ponta-a-ponta do pipeline de dados, treinamento, avaliação e exportação.
 
 Exemplos de uso:
     python -m src.pipeline                # Executa todas as etapas (1 -> 7)
-    python -m src.pipeline --skip-train   # Reprocessa dados + EDA + splits + exporta checkpoint atual
+    python -m src.pipeline --skip-train   # Reprocessa dados, avalia benchmarks e reexporta checkpoint atual
     python -m src.pipeline --only-data    # Executa apenas a camada de dados (Etapas 1 -> 4)
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 
 from src.data import dataset_builder, eda, features, preprocessing
-from src.modeling import train
+from src.modeling import evaluate, train
 from src.serving import export
 
 
@@ -20,16 +20,16 @@ def executar_pipeline(
     only_data: bool = False,
 ) -> None:
     """Executa as etapas do pipeline na ordem exata do DAG de dependências."""
-    print(">>> [1/6] Pré-processamento e auditoria contábil (src.data.preprocessing)")
+    print(">>> [1/7] Pré-processamento e auditoria contábil (src.data.preprocessing)")
     preprocessing.main()
 
-    print("\n>>> [2/6] Engenharia de features e catálogo oficial (src.data.features)")
+    print("\n>>> [2/7] Engenharia de features e catálogo oficial (src.data.features)")
     features.main()
 
-    print("\n>>> [3/6] Análise exploratória e geração de gráficos (src.data.eda)")
+    print("\n>>> [3/7] Análise exploratória e geração de gráficos (src.data.eda)")
     eda.main()
 
-    print("\n>>> [4/6] Split 80/20 anti-leakage e tensores (src.data.dataset_builder)")
+    print("\n>>> [4/7] Split 80/20 anti-leakage e tensores (src.data.dataset_builder)")
     dataset_builder.main()
 
     if only_data:
@@ -37,12 +37,15 @@ def executar_pipeline(
         return
 
     if not skip_train:
-        print("\n>>> [5/6] Treinamento, tuning Optuna e avaliação Hold-Out (src.modeling.train)")
+        print("\n>>> [5/7] Treinamento da rede principal + Optuna (src.modeling.train)")
         train.main()
     else:
-        print("\n>>> [5/6] Treinamento pulado (--skip-train): reutilizando checkpoint existente.")
+        print("\n>>> [5/7] Treinamento pulado (--skip-train): reutilizando models/best_checkpoint.pt.")
 
-    print("\n>>> [6/6] Exportação versionada do pacote do modelo (src.serving.export)")
+    print("\n>>> [6/7] Avaliação comparativa no Teste 20%: Baselines + DAE vs. MLP (src.modeling.evaluate)")
+    evaluate.main()
+
+    print("\n>>> [7/7] Exportação versionada do pacote do modelo (src.serving.export)")
     export.main()
     print("\n=== PIPELINE COMPLETO CONCLUÍDO COM SUCESSO ===")
 
@@ -55,7 +58,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-train",
         action="store_true",
-        help="Pula a etapa de treinamento/Optuna e reexporta usando models/best_checkpoint.pt.",
+        help="Pula o treinamento/Optuna da rede principal e reavalia/reexporta usando models/best_checkpoint.pt.",
     )
     parser.add_argument(
         "--only-data",

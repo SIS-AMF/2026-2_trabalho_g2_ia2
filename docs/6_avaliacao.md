@@ -5,10 +5,10 @@
 | Campo | Detalhe |
 | :--- | :--- |
 | **Objetivo** | Medir de forma imparcial no conjunto de **Teste Hold-Out (20%)** a qualidade do ranking de produtos/embalagens, a diversidade das recomendações e a precisão da previsão de quantidades |
-| **Módulos & Notebooks** | `src/utils/ranking.py`, `src/modeling/evaluate.py`, `notebooks/03_treino_e_avaliacao.ipynb` |
-| **Testes** | Validação determinística do cálculo de métricas Top-$K$ e comparação completa |
-| **Entradas** | Split de Teste Hold-Out 20% (`data/processed/splits/`), baselines, `BasketDAE` e melhor checkpoint de `FairMultiTaskRecommender` |
-| **Saídas** | `reports/evaluation_summary.csv`, `reports/figures/08_comparacao_modelos.png`, `reports/qualitative_cases.md` |
+| **Módulos & Notebooks** | `src/utils/ranking.py`, `src/modeling/baselines.py`, `src/modeling/evaluate.py`, `notebooks/03_treino_e_avaliacao.ipynb` |
+| **Testes** | Validação determinística do cálculo de métricas Top-$K$ e comparação completa (`python -m src.modeling.evaluate`) |
+| **Entradas** | Split de Teste Hold-Out 20% (`data/processed/splits/`), checkpoint treinado (`models/best_checkpoint.pt`) |
+| **Saídas** | `reports/evaluation_summary.csv`, `reports/evaluation_report.json`, `reports/figures/08_comparacao_modelos.png`, `reports/qualitative_cases.md` |
 | **Status** | `[x] Concluído` |
 
 ---
