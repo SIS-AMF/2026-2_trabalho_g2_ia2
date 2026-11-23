@@ -1,0 +1,20 @@
+# Dependências Python fixadas — Projeto Sistema de Recomendação para Feiras (IA II 2026/02)
+# Nota: para PyTorch CPU-only, instale com:
+# pip install torch==2.15.0+cpu --index-url https://download.pytorch.org/whl/cpu
+pandas==3.1.1
+numpy==2.5.5
+pyarrow==26.0.1
+tzdata==2026.6
+scikit-learn==1.9.1
+joblib==1.6.0
+torch>=2.15.0
+optuna==5.1.0
+matplotlib==3.11.2
+seaborn==0.13.2
+fastapi==0.165.0
+uvicorn==0.54.0
+httpx==0.28.1
+pytest==9.2.0
+nbformat==5.11.1
+nbclient==0.11.0
+ipykernel==7.4.0
